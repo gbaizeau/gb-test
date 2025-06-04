@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>12-Week Marathon Training Dashboard (4h00 Goal)</title>
+    <title>Amélie's 12-Week Marathon Training Dashboard (4h00 Goal)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -35,6 +35,12 @@
             text-decoration: line-through;
             opacity: 0.6;
         }
+        .motivational-text {
+            font-style: italic;
+            color: #0d9488; /* teal-600 */
+            padding-top: 4px;
+            padding-bottom: 8px;
+        }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800">
@@ -42,19 +48,18 @@
     <div class="container mx-auto p-4 md:p-8">
         
         <header class="text-center mb-8">
-            <h1 class="text-3xl md:text-4xl font-bold text-slate-900">Marathon Training Dashboard</h1>
+            <h1 class="text-3xl md:text-4xl font-bold text-slate-900">Amélie's Marathon Training Dashboard</h1>
             <p class="text-lg text-slate-600 mt-1">Queenstown Marathon - 4h00 Goal</p>
         </header>
 
         <main class="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
-            <!-- Left Column: Stats & Overview -->
             <aside class="lg:col-span-1 space-y-8">
                 
-                <!-- Countdown -->
                 <section class="bg-white p-6 rounded-2xl shadow-sm">
                     <h2 class="text-xl font-bold text-slate-900 mb-3">Race Day Countdown</h2>
-                    <p class="text-slate-600 mb-4">This timer shows how long until the Queenstown Marathon on November 15th, 2025. Use it as motivation to stay consistent with your training.</p>
+                    <p class="text-slate-600 mb-2">For Queenstown Marathon: <strong class="text-teal-600">November 15th, 2025</strong></p>
+                    <p class="text-slate-600 mb-4">This timer shows how long until race day. Use it as motivation to stay consistent!</p>
                     <div id="countdown" class="flex justify-center space-x-2 sm:space-x-4 text-center bg-slate-100 p-4 rounded-lg">
                         <div><span id="days" class="text-2xl sm:text-4xl font-bold text-teal-600">--</span><p class="text-xs text-slate-500">Days</p></div>
                         <div><span id="hours" class="text-2xl sm:text-4xl font-bold text-teal-600">--</span><p class="text-xs text-slate-500">Hours</p></div>
@@ -63,7 +68,6 @@
                     </div>
                 </section>
 
-                <!-- Weekly Mileage Chart -->
                 <section class="bg-white p-6 rounded-2xl shadow-sm">
                     <h2 class="text-xl font-bold text-slate-900 mb-3">Weekly Volume</h2>
                     <p class="text-slate-600 mb-4">This chart visualizes your planned total kilometers each week. It helps you see the training build-up and the taper period before the race.</p>
@@ -72,7 +76,6 @@
                     </div>
                 </section>
 
-                <!-- Pace Guide -->
                 <section class="bg-white p-6 rounded-2xl shadow-sm">
                     <h2 class="text-xl font-bold text-slate-900 mb-3">Pace Guide</h2>
                     <p class="text-slate-600 mb-4">Refer to this guide for your target paces during different types of workouts. Nailing these paces is key to achieving your 4-hour goal.</p>
@@ -87,7 +90,6 @@
 
             </aside>
 
-            <!-- Right Column: Training Plan -->
             <div class="lg:col-span-2">
                 <section class="bg-white p-6 rounded-2xl shadow-sm">
                     <div class="flex flex-col sm:flex-row justify-between sm:items-center mb-4">
@@ -99,7 +101,6 @@
                     </div>
                     <p id="plan-intro" class="text-slate-600 mb-6">This section shows your training plan. By default, you'll see the current week's workouts. Use the buttons to toggle between this week and the full 12-week schedule. Check off runs as you complete them to track your progress.</p>
                     <div id="plan-container" class="overflow-x-auto">
-                        <!-- Training plan table will be rendered here by JavaScript -->
                     </div>
                 </section>
             </div>
@@ -107,48 +108,53 @@
     </div>
 
     <script>
+        const planStartDate = new Date("2025-08-26T00:00:00"); 
+        const raceDate = new Date("2025-11-15T08:00:00");
+
         const trainingPlanData = [
-            { week: 1, phase: 1, dates: "Aug 26 - Sep 1", totalKm: 32, mon: "Rest", tue: "ER 8km + 4 Strides", wed: "Rest or XT", thu: "TR: 2km WU, 4km @ Tempo (5:15-5:25/km), 2km CD (8km total)", fri: "Rest", sat: "LR 16km", sun: "Rest or RR 3-5km" },
-            { week: 2, phase: 1, dates: "Sep 2 - Sep 8", totalKm: 39, mon: "Rest", tue: "ER 10km", wed: "Rest or XT", thu: "IT: 2km WU, 6x800m @ ~3:52-4:00 (400m jog recovery), 2km CD (approx 11km total)", fri: "Rest", sat: "LR 18km", sun: "Rest or RR 3-5km" },
-            { week: 3, phase: 1, dates: "Sep 9 - Sep 15", totalKm: 44, mon: "Rest", tue: "ER 10km + 4 Strides", wed: "Rest or XT", thu: "MP Run: 2km WU, 8km @ MP (5:41/km), 2km CD (12km total)", fri: "Rest", sat: "LR 22km", sun: "Rest or RR 3-5km" },
-            { week: 4, phase: 1, dates: "Sep 16 - Sep 22", totalKm: 37, mon: "Rest", tue: "ER 8km", wed: "Rest or XT", thu: "TR: 2km WU, 5km @ Tempo (5:15-5:25/km), 2km CD (9km total)", fri: "Rest", sat: "LR 20km", sun: "Rest or RR 3-5km" },
-            { week: 5, phase: 2, dates: "Sep 23 - Sep 29", totalKm: 49, mon: "Rest", tue: "IT: 2km WU, 5x1km @ ~5:00-5:10/km (400m jog recovery), 2km CD (approx 11km total)", wed: "Rest or XT or RR 5km", thu: "ER 12km + 4 Strides", fri: "Rest", sat: "LR 26km", sun: "Rest" },
-            { week: 6, phase: 2, dates: "Sep 30 - Oct 6", totalKm: 54, mon: "Rest", tue: "ER 10km", wed: "Rest or XT", thu: "MP Run: 2km WU, 10km @ MP (5:41/km), 2km CD (14km total)", fri: "Rest", sat: "LR 30km", sun: "Rest or RR 5km" },
-            { week: 7, phase: 2, dates: "Oct 7 - Oct 13", totalKm: 46, mon: "Rest", tue: "TR: 2km WU, 6km @ Tempo (5:15-5:25/km), 2km CD (10km total)", wed: "Rest or XT or RR 5km", thu: "ER 12km + 4 Strides", fri: "Rest", sat: "LR 24km (include 6-8km @ MP mid-run)", sun: "Rest" },
-            { week: 8, phase: 2, dates: "Oct 14 - Oct 20", totalKm: 54, mon: "Rest", tue: "IT: 7-8x800m @ ~3:52-4:00 (400m jog recovery), 2km CD (approx 11-12km total)", wed: "Rest or XT or RR 5km", thu: "ER 10km", fri: "Rest", sat: "LR 32km", sun: "Rest" },
-            { week: 9, phase: 3, dates: "Oct 21 - Oct 27", totalKm: 38, mon: "Rest", tue: "ER 8km", wed: "Rest or XT", thu: "MP Run: 2km WU, 6km @ MP (5:41/km), 2km CD (10km total)", fri: "Rest", sat: "LR 20km", sun: "Rest or RR 3-5km" },
-            { week: 10, phase: 3, dates: "Oct 28 - Nov 3", totalKm: 32, mon: "Rest", tue: "IT: 2km WU, 4x800m @ ~3:52-4:00 (400m jog recovery), 2km CD (approx 8km total)", wed: "Rest or XT or RR 3km", thu: "ER 8km + 4 Strides", fri: "Rest", sat: "LR 16km", sun: "Rest" },
-            { week: 11, phase: 3, dates: "Nov 4 - Nov 10", totalKm: 21, mon: "Rest", tue: "ER 6km + 4 Strides", wed: "Rest or XT", thu: "ER 5km", fri: "Rest", sat: "LR 10km (very easy)", sun: "Rest" },
-            { week: 12, phase: 3, dates: "Nov 11 - Nov 15", totalKm: 12, mon: "Rest/3k shakeout", tue: "ER 4-5km + strides", wed: "Rest", thu: "ER 2-3km", fri: "Rest", sat: "RACE DAY! 🏁", sun: "" }
+            { week: 1, dates: "Aug 26 - Sep 1", totalKm: 32, mon: "Rest", tue: "ER 8km + 4 Strides", wed: "Rest or XT", thu: "TR: 2km WU, 4km @ Tempo (5:15-5:25/km), 2km CD (8km total)", fri: "Rest", sat: "LR 16km", sun: "Rest or RR 3-5km", motivation: "Great start! Consistency is your superpower." },
+            { week: 2, dates: "Sep 2 - Sep 8", totalKm: 39, mon: "Rest", tue: "ER 10km", wed: "Rest or XT", thu: "IT: 2km WU, 6x800m @ ~3:52-4:00 (400m jog recovery), 2km CD (approx 11km total)", fri: "Rest", sat: "LR 18km", sun: "Rest or RR 3-5km", motivation: "Building that base. Every km counts!" },
+            { week: 3, dates: "Sep 9 - Sep 15", totalKm: 44, mon: "Rest", tue: "ER 10km + 4 Strides", wed: "Rest or XT", thu: "MP Run: 2km WU, 8km @ MP (5:41/km), 2km CD (12km total)", fri: "Rest", sat: "LR 22km", sun: "Rest or RR 3-5km", motivation: "First taste of Marathon Pace. You got this!" },
+            { week: 4, dates: "Sep 16 - Sep 22", totalKm: 37, mon: "Rest", tue: "ER 8km", wed: "Rest or XT", thu: "TR: 2km WU, 5km @ Tempo (5:15-5:25/km), 2km CD (9km total)", fri: "Rest", sat: "LR 20km", sun: "Rest or RR 3-5km", motivation: "Solid week. Recover well, you're earning it." },
+            { week: 5, dates: "Sep 23 - Sep 29", totalKm: 49, mon: "Rest", tue: "IT: 2km WU, 5x1km @ ~5:00-5:10/km (400m jog recovery), 2km CD (approx 11km total)", wed: "Rest or XT or RR 5km", thu: "ER 12km + 4 Strides", fri: "Rest", sat: "LR 26km", sun: "Rest", motivation: "Stepping up the intensity. Feel that strength!" },
+            { week: 6, dates: "Sep 30 - Oct 6", totalKm: 54, mon: "Rest", tue: "ER 10km", wed: "Rest or XT", thu: "MP Run: 2km WU, 10km @ MP (5:41/km), 2km CD (14km total)", fri: "Rest", sat: "LR 30km", sun: "Rest or RR 5km", motivation: "30km! Huge milestone. Believe in your progress." },
+            { week: 7, dates: "Oct 7 - Oct 13", totalKm: 46, mon: "Rest", tue: "TR: 2km WU, 6km @ Tempo (5:15-5:25/km), 2km CD (10km total)", wed: "Rest or XT or RR 5km", thu: "ER 12km + 4 Strides", fri: "Rest", sat: "LR 24km (include 6-8km @ MP mid-run)", sun: "Rest", motivation: "Mixing it up. Stay focused and trust the process." },
+            { week: 8, dates: "Oct 14 - Oct 20", totalKm: 54, mon: "Rest", tue: "IT: 7-8x800m @ ~3:52-4:00 (400m jog recovery), 2km CD (approx 11-12km total)", wed: "Rest or XT or RR 5km", thu: "ER 10km", fri: "Rest", sat: "LR 32km", sun: "Rest", motivation: "Longest run done! You're so ready for this." },
+            { week: 9, dates: "Oct 21 - Oct 27", totalKm: 38, mon: "Rest", tue: "ER 8km", wed: "Rest or XT", thu: "MP Run: 2km WU, 6km @ MP (5:41/km), 2km CD (10km total)", fri: "Rest", sat: "LR 20km", sun: "Rest or RR 3-5km", motivation: "Taper time. Let your body absorb all that hard work." },
+            { week: 10, dates: "Oct 28 - Nov 3", totalKm: 32, mon: "Rest", tue: "IT: 2km WU, 4x800m @ ~3:52-4:00 (400m jog recovery), 2km CD (approx 8km total)", wed: "Rest or XT or RR 3km", thu: "ER 8km + 4 Strides", fri: "Rest", sat: "LR 16km", sun: "Rest", motivation: "Stay sharp, stay rested. Nearly there!" },
+            { week: 11, dates: "Nov 4 - Nov 10", totalKm: 21, mon: "Rest", tue: "ER 6km + 4 Strides", wed: "Rest or XT", thu: "ER 5km", fri: "Rest", sat: "LR 10km (very easy)", sun: "Rest", motivation: "Almost there. Visualize crossing that finish line!" },
+            { week: 12, dates: "Nov 11 - Nov 15", totalKm: 12, mon: "Rest/3k shakeout", tue: "ER 4-5km + strides", wed: "Rest", thu: "ER 2-3km", fri: "Rest", sat: "RACE DAY! 🏁", sun: "", motivation: "Race week! Enjoy every moment. You've earned this!" }
         ];
 
         document.addEventListener('DOMContentLoaded', function() {
-            
             const planContainer = document.getElementById('plan-container');
             const viewWeekBtn = document.getElementById('view-week-btn');
             const viewFullBtn = document.getElementById('view-full-btn');
             const planIntro = document.getElementById('plan-intro');
-
-            const raceDate = new Date("2025-11-15T08:00:00");
-            const planStartDate = new Date("2025-08-26T00:00:00");
-
-            let completedRuns = JSON.parse(localStorage.getItem('completedRuns_4h00')) || {};
+            
+            let completedRuns = JSON.parse(localStorage.getItem('completedRuns_Amelie_4h00')) || {};
             
             function saveCompletedRuns() {
-                localStorage.setItem('completedRuns_4h00', JSON.stringify(completedRuns));
+                localStorage.setItem('completedRuns_Amelie_4h00', JSON.stringify(completedRuns));
             }
 
-            function getWeekNumber(currentDate, startDate) {
+            function getWeekNumber(currentDate, pStartDate) {
                 const msPerDay = 1000 * 60 * 60 * 24;
-                const daysSinceStart = Math.floor((currentDate - startDate) / msPerDay);
+                const daysSinceStart = Math.floor((currentDate - pStartDate) / msPerDay);
                 if (daysSinceStart < 0) return 1;
                 const weekNum = Math.floor(daysSinceStart / 7) + 1;
                 return weekNum > 12 ? 12 : weekNum;
             }
 
-            const currentWeekNumber = getWeekNumber(new Date(), planStartDate);
+            const currentWeekNumberGlobal = getWeekNumber(new Date(), planStartDate);
+
+            function getFormattedDate(baseDate, dayOffset) {
+                const targetDate = new Date(baseDate);
+                targetDate.setDate(targetDate.getDate() + dayOffset);
+                return targetDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+            }
             
-            function createTable(data, isFullView, currentWeek) {
+            function createTable(data, isFullView, currentDisplayWeek) {
                 const table = document.createElement('table');
                 table.className = 'w-full text-sm text-left border-collapse';
                 
@@ -156,7 +162,7 @@
                 thead.innerHTML = `
                     <tr class="border-b border-slate-200">
                         ${isFullView ? '<th class="p-2 font-semibold">Wk</th>' : ''}
-                        <th class="p-2 font-semibold">Day</th>
+                        <th class="p-2 font-semibold">Day & Date</th>
                         <th class="p-2 font-semibold">Workout</th>
                     </tr>
                 `;
@@ -164,32 +170,49 @@
 
                 const tbody = document.createElement('tbody');
                 data.forEach(weekData => {
-                    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+                    const weekStartDate = new Date(planStartDate);
+                    weekStartDate.setDate(weekStartDate.getDate() + (weekData.week - 1) * 7);
+
+                    const daysOfWeek = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
                     const workouts = [weekData.mon, weekData.tue, weekData.wed, weekData.thu, weekData.fri, weekData.sat, weekData.sun];
                     
-                    days.forEach((day, index) => {
-                        if (workouts[index]) {
-                            const runId = `w${weekData.week}d${index}`;
+                    daysOfWeek.forEach((dayName, dayIndex) => {
+                        if (workouts[dayIndex]) {
+                            const runId = `w${weekData.week}d${dayIndex}`;
                             const isCompleted = completedRuns[runId];
-                            const isCurrentWeek = weekData.week === currentWeek;
+                            const isCurrentActualWeek = weekData.week === currentDisplayWeek;
+                            const exactDateStr = getFormattedDate(weekStartDate, dayIndex);
                             
                             const row = document.createElement('tr');
-                            row.className = `border-b border-slate-100 ${isCurrentWeek ? 'bg-teal-50' : ''} ${isCompleted ? 'completed-run' : ''}`;
+                            row.className = `border-b border-slate-100 ${isCurrentActualWeek ? 'bg-teal-50' : ''} ${isCompleted ? 'completed-run' : ''}`;
                             
                             let rowHTML = '';
-                            if (isFullView) {
-                                rowHTML += (index === 0) ? `<td rowspan="7" class="p-2 font-semibold table-cell-top text-center border-r border-slate-200">${weekData.week}</td>` : '';
+                            if (isFullView && dayIndex === 0) {
+                                rowHTML += `<td rowspan="${workouts.filter(w => w).length}" class="p-2 font-semibold table-cell-top text-center border-r border-slate-200">${weekData.week}</td>`;
                             }
-                            rowHTML += `<td class="p-2 font-semibold text-slate-500">${day}</td>`;
-                            rowHTML += `<td class="p-2 flex items-center gap-3">
-                                <input type="checkbox" id="${runId}" class="run-checkbox h-4 w-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500" ${isCompleted ? 'checked' : ''}>
-                                <label for="${runId}" class="flex-1">${workouts[index]}</label>
+                            rowHTML += `<td class="p-2 font-semibold text-slate-500">${exactDateStr}</td>`;
+                            rowHTML += `<td class="p-2">
+                                <div class="flex items-center gap-3">
+                                    <input type="checkbox" id="${runId}" class="run-checkbox h-4 w-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500" ${isCompleted ? 'checked' : ''}>
+                                    <label for="${runId}" class="flex-1">${workouts[dayIndex]}</label>
+                                </div>
                             </td>`;
                             
                             row.innerHTML = rowHTML;
                             tbody.appendChild(row);
                         }
                     });
+                    if (weekData.motivation) {
+                         const motivationRow = document.createElement('tr');
+                         motivationRow.className = `border-b border-slate-100 ${weekData.week === currentDisplayWeek ? 'bg-teal-50' : ''}`;
+                         let motivationHTML = '';
+                         if (isFullView) {
+                            motivationHTML += `<td class="p-2"></td>`; 
+                         }
+                         motivationHTML += `<td colspan="${isFullView ? 1 : 2}" class="p-2 motivational-text text-center">${weekData.motivation}</td>`;
+                         motivationRow.innerHTML = motivationHTML;
+                         tbody.appendChild(motivationRow);
+                    }
                 });
                 table.appendChild(tbody);
                 return table;
@@ -197,9 +220,10 @@
 
             function renderPlan(isFull) {
                 planContainer.innerHTML = '';
-                let dataToShow = isFull ? trainingPlanData : [trainingPlanData.find(w => w.week === currentWeekNumber)];
-                if (!dataToShow[0]) dataToShow = [trainingPlanData[0]];
-                const table = createTable(dataToShow, isFull, currentWeekNumber);
+                let dataToShow = isFull ? trainingPlanData : [trainingPlanData.find(w => w.week === currentWeekNumberGlobal)];
+                if (!dataToShow[0] && trainingPlanData.length > 0) dataToShow = [trainingPlanData[0]]; // Fallback if current week not found
+                
+                const table = createTable(dataToShow, isFull, currentWeekNumberGlobal);
                 planContainer.appendChild(table);
                 attachCheckboxListeners();
             }
@@ -216,7 +240,7 @@
 
             viewWeekBtn.addEventListener('click', () => {
                 renderPlan(false);
-                planIntro.textContent = `Showing the plan for Week ${currentWeekNumber}. Check off runs as you complete them!`;
+                planIntro.textContent = `Showing the plan for Week ${currentWeekNumberGlobal}. Check off runs as you complete them!`;
                 viewWeekBtn.classList.add('bg-teal-600', 'text-white');
                 viewWeekBtn.classList.remove('bg-slate-200', 'text-slate-800');
                 viewFullBtn.classList.add('bg-slate-200', 'text-slate-800');
@@ -225,7 +249,7 @@
 
             viewFullBtn.addEventListener('click', () => {
                 renderPlan(true);
-                planIntro.textContent = `Showing the full 12-week plan. The current week (${currentWeekNumber}) is highlighted.`;
+                planIntro.textContent = `Showing the full 12-week plan. The current week (${currentWeekNumberGlobal}) is highlighted.`;
                 viewFullBtn.classList.add('bg-teal-600', 'text-white');
                 viewFullBtn.classList.remove('bg-slate-200', 'text-slate-800');
                 viewWeekBtn.classList.add('bg-slate-200', 'text-slate-800');
@@ -263,8 +287,8 @@
                         datasets: [{
                             label: 'Total KM',
                             data: trainingPlanData.map(w => w.totalKm),
-                            backgroundColor: trainingPlanData.map(w => w.week === currentWeekNumber ? 'rgba(13, 148, 136, 0.8)' : 'rgba(13, 148, 136, 0.4)'),
-                            borderColor: trainingPlanData.map(w => w.week === currentWeekNumber ? 'rgba(13, 148, 136, 1)' : 'rgba(13, 148, 136, 0.6)'),
+                            backgroundColor: trainingPlanData.map(w => w.week === currentWeekNumberGlobal ? 'rgba(13, 148, 136, 0.8)' : 'rgba(13, 148, 136, 0.4)'),
+                            borderColor: trainingPlanData.map(w => w.week === currentWeekNumberGlobal ? 'rgba(13, 148, 136, 1)' : 'rgba(13, 148, 136, 0.6)'),
                             borderWidth: 1,
                             hoverBackgroundColor: 'rgba(13, 148, 136, 1)',
                         }]
@@ -280,12 +304,8 @@
                             legend: { display: false },
                             tooltip: {
                                 callbacks: {
-                                    title: function(context) {
-                                        return context[0].label;
-                                    },
-                                    label: function(context) {
-                                        return `Total: ${context.raw} km`;
-                                    }
+                                    title: function(context) { return context[0].label; },
+                                    label: function(context) { return `Total: ${context.raw} km`; }
                                 }
                             }
                         }
