@@ -11,7 +11,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <!-- Chosen Palette: Slate & Teal -->
     <!-- Application Structure Plan: A dashboard layout is used to provide an at-a-glance overview. The left column contains key stats (countdown, paces) and a visual chart of weekly effort, providing constant context. The main right column dynamically displays the training plan, defaulting to "This Week's" workouts for immediate relevance. This structure was chosen to transform the static plan into an active, daily tool. Users can easily see what they need to do today, track their progress visually, and switch to the full plan for future planning, making the information highly consumable and user-friendly. -->
-    <!-- Visualization & Content Choices: Weekly KM (Report Info) -> Goal: Visualize training load -> Viz: Bar Chart (Chart.js) -> Interaction: Hover for details -> Justification: Clearly shows workload progression and taper. | Training Schedule (Report Info) -> Goal: Present daily workouts clearly -> Viz: Interactive HTML Table -> Interaction: JS highlights current week, checkboxes mark completion, input fields for actuals -> Justification: Makes the plan an active tracking and logging tool. | Race Date (Report Info) -> Goal: Build motivation -> Viz: Countdown Timer -> Interaction: None -> Justification: Creates a sense of urgency and excitement. -->
+    <!-- Visualization & Content Choices: Weekly KM (Report Info) -> Goal: Visualize training load -> Viz: Bar Chart (Chart.js) -> Interaction: Hover for details -> Justification: Clearly shows workload progression and taper. | Training Schedule (Report Info) -> Goal: Present daily workouts clearly -> Viz: Interactive HTML Table -> Interaction: JS highlights current week, checkboxes mark completion, input fields for actuals, collapsible rows -> Justification: Makes the plan an active tracking and logging tool, improving scannability. | Race Date (Report Info) -> Goal: Build motivation -> Viz: Countdown Timer -> Interaction: None -> Justification: Creates a sense of urgency and excitement. -->
     <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
     <style>
         body { font-family: 'Inter', sans-serif; }
@@ -31,7 +31,7 @@
             }
         }
         .table-cell-top { vertical-align: top; }
-        .completed-run label:first-of-type {
+        .completed-run > div > label:first-of-type { /* Targets the planned workout label for strikethrough */
             text-decoration: line-through;
             opacity: 0.7;
         }
@@ -61,8 +61,7 @@
             color: #94a3b8; /* slate-400 */
         }
         .bg-custom-yellow { background-color: #fff3cc; } 
-        /* .bg-green-100 { background-color: #dcfce7; }  Replaced by bg-teal-50 for completed */
-        .bg-teal-50 { background-color: #f0fdfa; } /* For completed runs and current week rest days */
+        .bg-teal-50 { background-color: #f0fdfa; } 
 
         .progress-bar-container {
             width: 100%;
@@ -73,12 +72,12 @@
             margin-bottom: 0.25rem;
         }
         .progress-bar {
-            background-color: #10b981; /* emerald-500, slightly different green for progress */
+            background-color: #10b981; /* emerald-500 */
             height: 100%;
             text-align: center;
-            line-height: 1.25rem; /* Same as height */
+            line-height: 1.25rem; 
             color: white;
-            font-size: 0.75rem; /* text-xs */
+            font-size: 0.75rem; 
             font-weight: bold;
             transition: width 0.3s ease-in-out;
         }
@@ -86,7 +85,25 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            font-size: 0.875rem; /* text-sm */
+            font-size: 0.875rem;
+        }
+        .run-details-collapsible {
+            display: none; /* Hidden by default */
+            padding-left: 2.5rem; /* Indent details */
+            margin-top: 0.5rem;
+        }
+        .run-details-collapsible.expanded {
+            display: block;
+        }
+        .toggle-details-btn {
+            cursor: pointer;
+            margin-right: 0.5rem;
+            font-weight: bold;
+            color: #0d9488; /* teal-600 */
+            user-select: none;
+            width: 1.5rem; /* Ensure consistent width */
+            display: inline-block;
+            text-align: center;
         }
     </style>
 </head>
@@ -145,7 +162,11 @@
                             <button id="view-full-btn" class="bg-slate-200 text-slate-800 py-2 px-4 rounded-lg font-semibold text-sm hover:bg-slate-300 transition-colors">Full Plan</button>
                         </div>
                     </div>
-                    <p id="plan-intro" class="text-slate-600 mb-6">Log your runs and track progress. Current week workouts are shown by default.</p>
+                     <div class="flex space-x-2 mb-4">
+                        <button id="expand-all-btn" class="bg-sky-500 text-white py-1 px-3 rounded-md text-xs hover:bg-sky-600 transition-colors">Expand All</button>
+                        <button id="collapse-all-btn" class="bg-sky-500 text-white py-1 px-3 rounded-md text-xs hover:bg-sky-600 transition-colors">Collapse All</button>
+                    </div>
+                    <p id="plan-intro" class="text-slate-600 mb-6">Log your runs and track progress. Current week workouts are shown by default. Click '+' to expand details.</p>
                     <div id="plan-container" class="overflow-x-auto">
                     </div>
                 </section>
@@ -156,7 +177,7 @@
     <script>
         const planStartDate = new Date("2025-08-26T00:00:00"); 
         const raceDate = new Date("2025-11-15T08:00:00");
-        const localStorageKey = 'completedRuns_Amelie_4h00_v5'; // Incremented version for new data structure/logic
+        const localStorageKey = 'completedRuns_Amelie_4h00_v6'; 
 
         const trainingPlanData = [
             { week: 1, dates: "Aug 26 - Sep 1", totalKm: 32, mon: "Rest", tue: "ER 8km + 4 Strides", wed: "Rest or XT", thu: "TR: 2km WU, 4km @ Tempo (5:15-5:25/km), 2km CD (8km total)", fri: "Rest", sat: "LR 16km", sun: "Rest or RR 3-5km", motivation: "Great start! Consistency is your superpower." },
@@ -173,11 +194,14 @@
             { week: 12, dates: "Nov 11 - Nov 15", totalKm: 12, mon: "Rest/3k shakeout", tue: "ER 4-5km + strides", wed: "Rest", thu: "ER 2-3km", fri: "Rest", sat: "RACE DAY! 🏁", sun: "", motivation: "Race week! Enjoy every moment. You've earned this!" }
         ];
         let mileageChartInstance = null;
+        let expandedState = {}; // To store expanded state of rows
 
         document.addEventListener('DOMContentLoaded', function() {
             const planContainer = document.getElementById('plan-container');
             const viewWeekBtn = document.getElementById('view-week-btn');
             const viewFullBtn = document.getElementById('view-full-btn');
+            const expandAllBtn = document.getElementById('expand-all-btn');
+            const collapseAllBtn = document.getElementById('collapse-all-btn');
             const planIntro = document.getElementById('plan-intro');
             
             let runLogData = JSON.parse(localStorage.getItem(localStorageKey)) || {};
@@ -203,22 +227,24 @@
             }
 
             function parseTimeToSeconds(timeStr) {
-                if (!timeStr) return 0; 
+                if (!timeStr) return 0;
                 const hhmmssPattern = /^\d{1,2}:\d{2}:\d{2}$/;
                 const mmssPattern = /^\d{1,2}:\d{2}$/;
                 let parts;
+
                 if (hhmmssPattern.test(timeStr)) {
                     parts = timeStr.split(':').map(Number);
                 } else if (mmssPattern.test(timeStr)) {
-                    parts = ("0:" + timeStr).split(':').map(Number); // Interpret as M:SS, then convert to H:M:SS
-                    parts.unshift(0); // Add 0 hours
+                    parts = timeStr.split(':').map(Number);
+                    parts.unshift(0); // Add 0 hours for MM:SS format
                 } else {
-                    return -1; 
+                    return -1; // Invalid format
                 }
+
                 if (parts.length === 3 && parts.every(p => !isNaN(p)) && parts[1] < 60 && parts[2] < 60) {
-                     return parts[0] * 3600 + parts[1] * 60 + parts[2];
+                    return parts[0] * 3600 + parts[1] * 60 + parts[2];
                 }
-                return -1;
+                return -1; // Invalid values (e.g., minutes/seconds >= 60)
             }
             
             function isValidDistance(distStr) {
@@ -246,6 +272,35 @@
                 }
                 return "--:-- /km";
             }
+
+            function findNextUpcomingRunId() {
+                const today = new Date();
+                today.setHours(0,0,0,0);
+
+                for (const weekData of trainingPlanData) {
+                    const weekStartDate = new Date(planStartDate);
+                    weekStartDate.setDate(weekStartDate.getDate() + (weekData.week - 1) * 7);
+                    const daysOfWeek = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+                    const plannedWorkouts = [weekData.mon, weekData.tue, weekData.wed, weekData.thu, weekData.fri, weekData.sat, weekData.sun];
+
+                    for (let dayIndex = 0; dayIndex < daysOfWeek.length; dayIndex++) {
+                        const plannedWorkout = plannedWorkouts[dayIndex];
+                        if (plannedWorkout) {
+                            const runDate = new Date(weekStartDate);
+                            runDate.setDate(runDate.getDate() + dayIndex);
+                            runDate.setHours(0,0,0,0);
+                            const runId = `w${weekData.week}d${dayIndex}`;
+                            const log = runLogData[runId] || { completed: false };
+                            const isRestDay = plannedWorkout.toLowerCase().startsWith("rest");
+
+                            if (runDate >= today && !isRestDay && !log.completed) {
+                                return runId;
+                            }
+                        }
+                    }
+                }
+                return null; // No upcoming non-rest, non-completed run
+            }
             
             function createTable(dataToDisplay, isFullView, currentDisplayWeek) {
                 const table = document.createElement('table');
@@ -262,6 +317,8 @@
                 table.appendChild(thead);
 
                 const tbody = document.createElement('tbody');
+                const nextUpcomingRunId = findNextUpcomingRunId();
+
                 dataToDisplay.forEach(weekData => {
                     const weekStartDate = new Date(planStartDate);
                     weekStartDate.setDate(weekStartDate.getDate() + (weekData.week - 1) * 7);
@@ -284,7 +341,7 @@
                             const row = document.createElement('tr');
                             let rowBgClass = '';
                             if (!isRestDay) {
-                                rowBgClass = log.completed ? 'bg-teal-50' : 'bg-custom-yellow'; // Updated colors
+                                rowBgClass = log.completed ? 'bg-teal-50' : 'bg-custom-yellow';
                             } else if (isCurrentActualWeek) {
                                 rowBgClass = 'bg-teal-50'; 
                             }
@@ -308,28 +365,35 @@
                                     <span class="font-medium text-slate-800">${plannedWorkout}</span>
                                 </td>`;
                             } else {
-                                rowHTML += `<td class="p-3 space-y-3">
-                                    <div class="flex items-start gap-3">
+                                const isExpanded = expandedState[runId] === undefined ? (runId === nextUpcomingRunId) : expandedState[runId];
+                                if (expandedState[runId] === undefined && runId === nextUpcomingRunId) expandedState[runId] = true;
+
+
+                                rowHTML += `<td class="p-3">
+                                    <div class="flex items-start gap-1">
+                                        <span class="toggle-details-btn" data-runid="${runId}">${isExpanded ? '−' : '+'}</span>
                                         <input type="checkbox" id="${runId}-completed" data-runid="${runId}" class="run-checkbox-completed h-5 w-5 mt-1 rounded border-gray-400 text-teal-600 focus:ring-teal-500 cursor-pointer" ${log.completed ? 'checked' : ''}>
                                         <label for="${runId}-completed" class="flex-1 font-medium text-slate-800 cursor-pointer">${plannedWorkout}</label>
                                     </div>
-                                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 pl-8">
-                                        <div>
-                                            <label for="${runId}-time" class="block text-xs font-medium text-slate-500 mb-1">Time Ran</label>
-                                            <input type="text" id="${runId}-time" data-runid="${runId}" value="${log.actualTime || ''}" placeholder="HH:MM:SS or MM:SS" class="actual-time-input input-sm w-full">
+                                    <div id="${runId}-details" class="run-details-collapsible ${isExpanded ? 'expanded' : ''}">
+                                        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 mt-2">
+                                            <div>
+                                                <label for="${runId}-time" class="block text-xs font-medium text-slate-500 mb-1">Time Ran</label>
+                                                <input type="text" id="${runId}-time" data-runid="${runId}" value="${log.actualTime || ''}" placeholder="HH:MM:SS or MM:SS" class="actual-time-input input-sm w-full">
+                                            </div>
+                                            <div>
+                                                <label for="${runId}-dist" class="block text-xs font-medium text-slate-500 mb-1">Distance (km)</label>
+                                                <input type="number" id="${runId}-dist" data-runid="${runId}" value="${log.actualDistance || ''}" step="0.01" placeholder="e.g., 5.25" class="actual-distance-input input-sm w-full">
+                                            </div>
+                                            <div>
+                                                <label class="block text-xs font-medium text-slate-500 mb-1">Actual Pace</label>
+                                                <span id="${runId}-pace" class="calculated-pace block p-1.5 text-sm ${log.calculatedPace === '--:-- /km' || !log.calculatedPace ? 'pace-greyed' : 'font-semibold text-slate-700'}">${log.calculatedPace || '--:-- /km'}</span>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <label for="${runId}-dist" class="block text-xs font-medium text-slate-500 mb-1">Distance (km)</label>
-                                            <input type="number" id="${runId}-dist" data-runid="${runId}" value="${log.actualDistance || ''}" step="0.01" placeholder="e.g., 5.25" class="actual-distance-input input-sm w-full">
+                                        <div class="mt-2">
+                                            <label for="${runId}-comments" class="block text-xs font-medium text-slate-500 mb-1">Comments</label>
+                                            <textarea id="${runId}-comments" data-runid="${runId}" placeholder="How was the run? Any notes..." class="actual-comments-input input-sm w-full text-xs" rows="2">${log.comments || ''}</textarea>
                                         </div>
-                                        <div>
-                                            <label class="block text-xs font-medium text-slate-500 mb-1">Actual Pace</label>
-                                            <span id="${runId}-pace" class="calculated-pace block p-1.5 text-sm ${log.calculatedPace === '--:-- /km' || !log.calculatedPace ? 'pace-greyed' : 'font-semibold text-slate-700'}">${log.calculatedPace || '--:-- /km'}</span>
-                                        </div>
-                                    </div>
-                                    <div class="pl-8">
-                                        <label for="${runId}-comments" class="block text-xs font-medium text-slate-500 mb-1">Comments</label>
-                                        <textarea id="${runId}-comments" data-runid="${runId}" placeholder="How was the run? Any notes..." class="actual-comments-input input-sm w-full text-xs" rows="2">${log.comments || ''}</textarea>
                                     </div>
                                 </td>`;
                             }
@@ -388,13 +452,13 @@
                     const isRestDay = plannedWorkoutText.toLowerCase().startsWith("rest");
                     
                     rowElement.classList.toggle('completed-run', value && !isRestDay);
-                    rowElement.classList.remove('bg-custom-yellow', 'bg-teal-50'); // Remove old color classes
+                    rowElement.classList.remove('bg-custom-yellow', 'bg-teal-50'); 
                     
                     const weekNumberFromRunId = parseInt(runId.match(/w(\d+)/)[1]);
                     const isCurrentActualWeek = weekNumberFromRunId === currentWeekNumberGlobal;
 
                     if (!isRestDay) {
-                        rowElement.classList.add(value ? 'bg-teal-50' : 'bg-custom-yellow'); // Use teal for completed
+                        rowElement.classList.add(value ? 'bg-teal-50' : 'bg-custom-yellow'); 
                     } else if (isCurrentActualWeek) {
                          rowElement.classList.add('bg-teal-50');
                     }
@@ -428,6 +492,19 @@
                         updateRunDataAndUI(runId, field, target.value);
                     }
                 }, true); 
+
+                planContainer.addEventListener('click', function(e) {
+                    if (e.target.classList.contains('toggle-details-btn')) {
+                        const runId = e.target.dataset.runid;
+                        const detailsDiv = document.getElementById(`${runId}-details`);
+                        if (detailsDiv) {
+                            const isCurrentlyExpanded = detailsDiv.classList.contains('expanded');
+                            detailsDiv.classList.toggle('expanded');
+                            e.target.textContent = isCurrentlyExpanded ? '+' : '−';
+                            expandedState[runId] = !isCurrentlyExpanded;
+                        }
+                    }
+                });
             }
             
             function updateWeeklySummaryDisplay(weekNumber, plannedKm) {
@@ -455,6 +532,27 @@
                     `;
                 }
             }
+
+            function toggleAllDetails(expand) {
+                document.querySelectorAll('.run-details-collapsible').forEach(div => {
+                    const runId = div.id.replace('-details', '');
+                    if (expand) {
+                        div.classList.add('expanded');
+                        expandedState[runId] = true;
+                        const btn = planContainer.querySelector(`.toggle-details-btn[data-runid="${runId}"]`);
+                        if(btn) btn.textContent = '−';
+                    } else {
+                        div.classList.remove('expanded');
+                        expandedState[runId] = false;
+                        const btn = planContainer.querySelector(`.toggle-details-btn[data-runid="${runId}"]`);
+                        if(btn) btn.textContent = '+';
+                    }
+                });
+            }
+
+            expandAllBtn.addEventListener('click', () => toggleAllDetails(true));
+            collapseAllBtn.addEventListener('click', () => toggleAllDetails(false));
+
 
             function renderPlan(isFull) {
                 planContainer.innerHTML = '';
@@ -536,12 +634,12 @@
                     if (weekEndDateForCalc < today) { 
                         const planned = weekData.totalKm;
                         const actual = actualKms[index];
-                        if (planned === 0 && actual > 0) return 'rgba(16, 185, 129, 0.7)'; // Emerald-500 (Green)
+                        if (planned === 0 && actual > 0) return 'rgba(16, 185, 129, 0.7)'; 
                         if (planned === 0) return 'rgba(203, 213, 225, 0.5)'; 
                         const percentage = (actual / planned);
-                        if (percentage >= 0.95) return 'rgba(16, 185, 129, 0.7)'; // Emerald-500 (Green)
-                        if (percentage >= 0.70) return 'rgba(245, 158, 11, 0.7)'; // Amber-500 (Orange)
-                        return 'rgba(239, 68, 68, 0.7)'; // Red-500
+                        if (percentage >= 0.95) return 'rgba(16, 185, 129, 0.7)'; 
+                        if (percentage >= 0.70) return 'rgba(245, 158, 11, 0.7)'; 
+                        return 'rgba(239, 68, 68, 0.7)'; 
                     }
                     return 'rgba(100, 116, 139, 0.5)'; 
                 });
@@ -559,8 +657,8 @@
                             {
                                 label: 'Planned KM',
                                 data: trainingPlanData.map(w => w.totalKm),
-                                backgroundColor: trainingPlanData.map(w => w.week === currentWeekNumberGlobal ? 'rgba(20, 184, 166, 0.7)' : 'rgba(20, 184, 166, 0.3)'), // Teal-500
-                                borderColor: trainingPlanData.map(w => w.week === currentWeekNumberGlobal ? 'rgba(15, 118, 110, 1)' : 'rgba(15, 118, 110, 0.5)'), // Teal-700
+                                backgroundColor: trainingPlanData.map(w => w.week === currentWeekNumberGlobal ? 'rgba(20, 184, 166, 0.7)' : 'rgba(20, 184, 166, 0.3)'), 
+                                borderColor: trainingPlanData.map(w => w.week === currentWeekNumberGlobal ? 'rgba(15, 118, 110, 1)' : 'rgba(15, 118, 110, 0.5)'), 
                                 borderWidth: 1,
                                 order: 2
                             },
