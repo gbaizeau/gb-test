@@ -60,9 +60,9 @@
         .pace-greyed {
             color: #94a3b8; /* slate-400 */
         }
-        .bg-yellow-100 { background-color: #fef9c3; } 
-        .bg-green-100 { background-color: #dcfce7; } 
-        .bg-teal-50 { background-color: #f0fdfa; }
+        .bg-custom-yellow { background-color: #fff3cc; } 
+        /* .bg-green-100 { background-color: #dcfce7; }  Replaced by bg-teal-50 for completed */
+        .bg-teal-50 { background-color: #f0fdfa; } /* For completed runs and current week rest days */
 
         .progress-bar-container {
             width: 100%;
@@ -73,7 +73,7 @@
             margin-bottom: 0.25rem;
         }
         .progress-bar {
-            background-color: #22c55e; /* green-500 */
+            background-color: #10b981; /* emerald-500, slightly different green for progress */
             height: 100%;
             text-align: center;
             line-height: 1.25rem; /* Same as height */
@@ -156,7 +156,7 @@
     <script>
         const planStartDate = new Date("2025-08-26T00:00:00"); 
         const raceDate = new Date("2025-11-15T08:00:00");
-        const localStorageKey = 'completedRuns_Amelie_4h00_v4'; 
+        const localStorageKey = 'completedRuns_Amelie_4h00_v5'; // Incremented version for new data structure/logic
 
         const trainingPlanData = [
             { week: 1, dates: "Aug 26 - Sep 1", totalKm: 32, mon: "Rest", tue: "ER 8km + 4 Strides", wed: "Rest or XT", thu: "TR: 2km WU, 4km @ Tempo (5:15-5:25/km), 2km CD (8km total)", fri: "Rest", sat: "LR 16km", sun: "Rest or RR 3-5km", motivation: "Great start! Consistency is your superpower." },
@@ -203,20 +203,29 @@
             }
 
             function parseTimeToSeconds(timeStr) {
-                if (!timeStr) return 0;
-                const parts = timeStr.split(':').map(Number);
+                if (!timeStr) return 0; 
+                const hhmmssPattern = /^\d{1,2}:\d{2}:\d{2}$/;
+                const mmssPattern = /^\d{1,2}:\d{2}$/;
+                let parts;
+                if (hhmmssPattern.test(timeStr)) {
+                    parts = timeStr.split(':').map(Number);
+                } else if (mmssPattern.test(timeStr)) {
+                    parts = ("0:" + timeStr).split(':').map(Number); // Interpret as M:SS, then convert to H:M:SS
+                    parts.unshift(0); // Add 0 hours
+                } else {
+                    return -1; 
+                }
                 if (parts.length === 3 && parts.every(p => !isNaN(p)) && parts[1] < 60 && parts[2] < 60) {
                      return parts[0] * 3600 + parts[1] * 60 + parts[2];
                 }
-                return -1; // Indicates invalid format
+                return -1;
             }
             
             function isValidDistance(distStr) {
-                if (!distStr) return true; // Empty is not an error for styling, just no calculation
+                if (!distStr) return true;
                 const num = parseFloat(distStr);
                 return !isNaN(num) && num >= 0;
             }
-
 
             function formatSecondsToHHMMSS(totalSeconds) {
                 if (isNaN(totalSeconds) || totalSeconds <= 0) return "00:00:00";
@@ -275,12 +284,11 @@
                             const row = document.createElement('tr');
                             let rowBgClass = '';
                             if (!isRestDay) {
-                                rowBgClass = log.completed ? 'bg-green-100' : 'bg-yellow-100';
+                                rowBgClass = log.completed ? 'bg-teal-50' : 'bg-custom-yellow'; // Updated colors
                             } else if (isCurrentActualWeek) {
-                                rowBgClass = 'bg-teal-50'; // Current week rest days
+                                rowBgClass = 'bg-teal-50'; 
                             }
-                            // Non-current rest days will have default white/slate bg
-
+                            
                             row.className = `border-b border-slate-200 ${rowBgClass}`;
                             if (log.completed && !isRestDay) {
                                 row.classList.add('completed-run');
@@ -308,7 +316,7 @@
                                     <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 pl-8">
                                         <div>
                                             <label for="${runId}-time" class="block text-xs font-medium text-slate-500 mb-1">Time Ran</label>
-                                            <input type="text" id="${runId}-time" data-runid="${runId}" value="${log.actualTime || ''}" placeholder="HH:MM:SS" class="actual-time-input input-sm w-full">
+                                            <input type="text" id="${runId}-time" data-runid="${runId}" value="${log.actualTime || ''}" placeholder="HH:MM:SS or MM:SS" class="actual-time-input input-sm w-full">
                                         </div>
                                         <div>
                                             <label for="${runId}-dist" class="block text-xs font-medium text-slate-500 mb-1">Distance (km)</label>
@@ -333,7 +341,7 @@
 
                     if (weekData.motivation || isFullView) {
                          const summaryAndMotivationRow = document.createElement('tr');
-                         let summaryBgClass = (weekData.week === currentDisplayWeek && !isFullView) ? 'bg-teal-50' : 'bg-slate-100'; // Keep current week teal in single view
+                         let summaryBgClass = (weekData.week === currentDisplayWeek && !isFullView) ? 'bg-teal-50' : 'bg-slate-100';
                          summaryAndMotivationRow.className = `border-b-2 border-slate-300 ${summaryBgClass}`;
                          let smHTML = '';
                          if (isFullView) smHTML += `<td class="p-3"></td>`;
@@ -361,9 +369,6 @@
                 const distInputEl = document.getElementById(`${runId}-dist`);
 
                 if (field === 'actualTime' || field === 'actualDistance') {
-                    const validTime = parseTimeToSeconds(runLogData[runId].actualTime) !== -1 || !runLogData[runId].actualTime;
-                    const validDist = isValidDistance(runLogData[runId].actualDistance);
-
                     if(timeInputEl) timeInputEl.classList.toggle('input-error', parseTimeToSeconds(runLogData[runId].actualTime) === -1 && runLogData[runId].actualTime !== '');
                     if(distInputEl) distInputEl.classList.toggle('input-error', !isValidDistance(runLogData[runId].actualDistance) && runLogData[runId].actualDistance !== '');
                     
@@ -383,13 +388,13 @@
                     const isRestDay = plannedWorkoutText.toLowerCase().startsWith("rest");
                     
                     rowElement.classList.toggle('completed-run', value && !isRestDay);
-                    rowElement.classList.remove('bg-yellow-100', 'bg-green-100', 'bg-teal-50');
+                    rowElement.classList.remove('bg-custom-yellow', 'bg-teal-50'); // Remove old color classes
                     
                     const weekNumberFromRunId = parseInt(runId.match(/w(\d+)/)[1]);
                     const isCurrentActualWeek = weekNumberFromRunId === currentWeekNumberGlobal;
 
                     if (!isRestDay) {
-                        rowElement.classList.add(value ? 'bg-green-100' : 'bg-yellow-100');
+                        rowElement.classList.add(value ? 'bg-teal-50' : 'bg-custom-yellow'); // Use teal for completed
                     } else if (isCurrentActualWeek) {
                          rowElement.classList.add('bg-teal-50');
                     }
@@ -400,7 +405,7 @@
                 const weekPlan = trainingPlanData.find(w => w.week === weekNumber);
                 if(weekPlan) {
                     updateWeeklySummaryDisplay(weekNumber, weekPlan.totalKm);
-                    renderChart(); // Re-render chart to update actuals
+                    renderChart(); 
                 }
             }
 
@@ -511,7 +516,7 @@
                     const weekEndDateForCalc = new Date(weekStartDateForCalc);
                     weekEndDateForCalc.setDate(weekEndDateForCalc.getDate() + 6);
 
-                    if (weekEndDateForCalc < today || weekData.week === currentWeekNumberGlobal) { // Only calculate for past or current weeks
+                    if (weekEndDateForCalc < today || weekData.week === currentWeekNumberGlobal) { 
                         for (let i = 0; i < 7; i++) {
                             const runId = `w${weekData.week}d${i}`;
                             if (runLogData[runId] && runLogData[runId].actualDistance && isValidDistance(runLogData[runId].actualDistance)) {
@@ -528,17 +533,17 @@
                     const weekEndDateForCalc = new Date(weekStartDateForCalc);
                     weekEndDateForCalc.setDate(weekEndDateForCalc.getDate() + 6);
 
-                    if (weekEndDateForCalc < today) { // Past weeks only for color coding
+                    if (weekEndDateForCalc < today) { 
                         const planned = weekData.totalKm;
                         const actual = actualKms[index];
-                        if (planned === 0 && actual > 0) return 'rgba(74, 222, 128, 0.7)'; // Green if any running on 0km plan
-                        if (planned === 0) return 'rgba(203, 213, 225, 0.5)'; // Neutral for 0km planned, 0km actual
+                        if (planned === 0 && actual > 0) return 'rgba(16, 185, 129, 0.7)'; // Emerald-500 (Green)
+                        if (planned === 0) return 'rgba(203, 213, 225, 0.5)'; 
                         const percentage = (actual / planned);
-                        if (percentage >= 0.95) return 'rgba(74, 222, 128, 0.7)'; // Green
-                        if (percentage >= 0.70) return 'rgba(251, 146, 60, 0.7)'; // Orange
-                        return 'rgba(239, 68, 68, 0.7)'; // Red
+                        if (percentage >= 0.95) return 'rgba(16, 185, 129, 0.7)'; // Emerald-500 (Green)
+                        if (percentage >= 0.70) return 'rgba(245, 158, 11, 0.7)'; // Amber-500 (Orange)
+                        return 'rgba(239, 68, 68, 0.7)'; // Red-500
                     }
-                    return 'rgba(100, 116, 139, 0.5)'; // Default/Current/Future weeks actuals color (slate)
+                    return 'rgba(100, 116, 139, 0.5)'; 
                 });
 
 
@@ -554,8 +559,8 @@
                             {
                                 label: 'Planned KM',
                                 data: trainingPlanData.map(w => w.totalKm),
-                                backgroundColor: trainingPlanData.map(w => w.week === currentWeekNumberGlobal ? 'rgba(13, 148, 136, 0.8)' : 'rgba(13, 148, 136, 0.4)'),
-                                borderColor: trainingPlanData.map(w => w.week === currentWeekNumberGlobal ? 'rgba(13, 148, 136, 1)' : 'rgba(13, 148, 136, 0.6)'),
+                                backgroundColor: trainingPlanData.map(w => w.week === currentWeekNumberGlobal ? 'rgba(20, 184, 166, 0.7)' : 'rgba(20, 184, 166, 0.3)'), // Teal-500
+                                borderColor: trainingPlanData.map(w => w.week === currentWeekNumberGlobal ? 'rgba(15, 118, 110, 1)' : 'rgba(15, 118, 110, 0.5)'), // Teal-700
                                 borderWidth: 1,
                                 order: 2
                             },
@@ -563,7 +568,7 @@
                                 label: 'Actual KM',
                                 data: actualKms,
                                 backgroundColor: actualKmColors,
-                                borderColor: actualKmColors.map(color => color.replace('0.7', '1').replace('0.5','0.8')), // Darker border
+                                borderColor: actualKmColors.map(color => color.replace(/0\.[753]\)/, '1)')), 
                                 borderWidth: 1,
                                 order: 1
                             }
