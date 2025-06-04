@@ -31,15 +31,16 @@
             }
         }
         .table-cell-top { vertical-align: top; }
-        .completed-run label:first-of-type { /* Targets the planned workout label */
+        .completed-run label:first-of-type {
             text-decoration: line-through;
-            opacity: 0.6;
+            opacity: 0.7;
         }
         .motivational-text {
             font-style: italic;
             color: #0d9488; /* teal-600 */
             padding-top: 4px;
             padding-bottom: 8px;
+            font-size: 0.875rem;
         }
         .input-sm {
             font-size: 0.875rem;
@@ -47,14 +48,45 @@
             border-radius: 0.25rem;
             border: 1px solid #cbd5e1; /* slate-300 */
         }
+        .input-error {
+            border-color: #ef4444 !important; /* red-500 */
+            box-shadow: 0 0 0 1px #ef4444;
+        }
         .weekly-summary-row td {
-            padding-top: 0.75rem;
-            padding-bottom: 0.75rem;
+            padding-top: 0.75rem !important;
+            padding-bottom: 0.75rem !important;
             font-weight: 600;
-            background-color: #f8fafc; /* slate-50 */
         }
         .pace-greyed {
             color: #94a3b8; /* slate-400 */
+        }
+        .bg-yellow-100 { background-color: #fef9c3; } 
+        .bg-green-100 { background-color: #dcfce7; } 
+        .bg-teal-50 { background-color: #f0fdfa; }
+
+        .progress-bar-container {
+            width: 100%;
+            background-color: #e2e8f0; /* slate-200 */
+            border-radius: 0.375rem; /* rounded-md */
+            height: 1.25rem; /* h-5 */
+            overflow: hidden;
+            margin-bottom: 0.25rem;
+        }
+        .progress-bar {
+            background-color: #22c55e; /* green-500 */
+            height: 100%;
+            text-align: center;
+            line-height: 1.25rem; /* Same as height */
+            color: white;
+            font-size: 0.75rem; /* text-xs */
+            font-weight: bold;
+            transition: width 0.3s ease-in-out;
+        }
+        .weekly-summary-details {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.875rem; /* text-sm */
         }
     </style>
 </head>
@@ -73,8 +105,7 @@
                 
                 <section class="bg-white p-6 rounded-2xl shadow-sm">
                     <h2 class="text-xl font-bold text-slate-900 mb-3">Race Day Countdown</h2>
-                    <p class="text-slate-600 mb-2">For Queenstown Marathon: <strong class="text-teal-600">November 15th, 2025</strong></p>
-                    <p class="text-slate-600 mb-4">This timer shows how long until race day. Use it as motivation to stay consistent!</p>
+                    <p class="text-slate-600 mb-4">Queenstown Marathon: <strong class="text-teal-600">November 15th, 2025</strong></p>
                     <div id="countdown" class="flex justify-center space-x-2 sm:space-x-4 text-center bg-slate-100 p-4 rounded-lg">
                         <div><span id="days" class="text-2xl sm:text-4xl font-bold text-teal-600">--</span><p class="text-xs text-slate-500">Days</p></div>
                         <div><span id="hours" class="text-2xl sm:text-4xl font-bold text-teal-600">--</span><p class="text-xs text-slate-500">Hours</p></div>
@@ -85,7 +116,7 @@
 
                 <section class="bg-white p-6 rounded-2xl shadow-sm">
                     <h2 class="text-xl font-bold text-slate-900 mb-3">Weekly Volume</h2>
-                    <p class="text-slate-600 mb-4">This chart visualizes your planned total kilometers each week. It helps you see the training build-up and the taper period before the race.</p>
+                    <p class="text-slate-600 mb-4">Track your planned vs. actual kilometers. Colors for past weeks: Green (≥95%), Orange (70-94%), Red (<70%).</p>
                     <div class="chart-container">
                         <canvas id="mileageChart"></canvas>
                     </div>
@@ -93,7 +124,7 @@
 
                 <section class="bg-white p-6 rounded-2xl shadow-sm">
                     <h2 class="text-xl font-bold text-slate-900 mb-3">Pace Guide</h2>
-                    <p class="text-slate-600 mb-4">Refer to this guide for your target paces during different types of workouts. Nailing these paces is key to achieving your 4-hour goal.</p>
+                    <p class="text-slate-600 mb-4">Target paces for your 4-hour goal.</p>
                     <div class="space-y-2 text-sm">
                         <div class="flex justify-between p-2 rounded bg-slate-50"><span>Easy Run (ER)</span><span class="font-semibold">6:15-7:00 /km</span></div>
                         <div class="flex justify-between p-2 rounded bg-slate-50"><span>Long Run (LR)</span><span class="font-semibold">6:10-6:30 /km</span></div>
@@ -114,7 +145,7 @@
                             <button id="view-full-btn" class="bg-slate-200 text-slate-800 py-2 px-4 rounded-lg font-semibold text-sm hover:bg-slate-300 transition-colors">Full Plan</button>
                         </div>
                     </div>
-                    <p id="plan-intro" class="text-slate-600 mb-6">This section shows your training plan. By default, you'll see the current week's workouts. Use the buttons to toggle between this week and the full 12-week schedule. Check off runs as you complete them and log your actuals.</p>
+                    <p id="plan-intro" class="text-slate-600 mb-6">Log your runs and track progress. Current week workouts are shown by default.</p>
                     <div id="plan-container" class="overflow-x-auto">
                     </div>
                 </section>
@@ -125,7 +156,7 @@
     <script>
         const planStartDate = new Date("2025-08-26T00:00:00"); 
         const raceDate = new Date("2025-11-15T08:00:00");
-        const localStorageKey = 'completedRuns_Amelie_4h00_v2';
+        const localStorageKey = 'completedRuns_Amelie_4h00_v4'; 
 
         const trainingPlanData = [
             { week: 1, dates: "Aug 26 - Sep 1", totalKm: 32, mon: "Rest", tue: "ER 8km + 4 Strides", wed: "Rest or XT", thu: "TR: 2km WU, 4km @ Tempo (5:15-5:25/km), 2km CD (8km total)", fri: "Rest", sat: "LR 16km", sun: "Rest or RR 3-5km", motivation: "Great start! Consistency is your superpower." },
@@ -141,6 +172,7 @@
             { week: 11, dates: "Nov 4 - Nov 10", totalKm: 21, mon: "Rest", tue: "ER 6km + 4 Strides", wed: "Rest or XT", thu: "ER 5km", fri: "Rest", sat: "LR 10km (very easy)", sun: "Rest", motivation: "Almost there. Visualize crossing that finish line!" },
             { week: 12, dates: "Nov 11 - Nov 15", totalKm: 12, mon: "Rest/3k shakeout", tue: "ER 4-5km + strides", wed: "Rest", thu: "ER 2-3km", fri: "Rest", sat: "RACE DAY! 🏁", sun: "", motivation: "Race week! Enjoy every moment. You've earned this!" }
         ];
+        let mileageChartInstance = null;
 
         document.addEventListener('DOMContentLoaded', function() {
             const planContainer = document.getElementById('plan-container');
@@ -171,13 +203,23 @@
             }
 
             function parseTimeToSeconds(timeStr) {
-                if (!timeStr || !/^\d{1,2}:\d{2}:\d{2}$/.test(timeStr)) return 0;
+                if (!timeStr) return 0;
                 const parts = timeStr.split(':').map(Number);
-                return parts[0] * 3600 + parts[1] * 60 + parts[2];
+                if (parts.length === 3 && parts.every(p => !isNaN(p)) && parts[1] < 60 && parts[2] < 60) {
+                     return parts[0] * 3600 + parts[1] * 60 + parts[2];
+                }
+                return -1; // Indicates invalid format
+            }
+            
+            function isValidDistance(distStr) {
+                if (!distStr) return true; // Empty is not an error for styling, just no calculation
+                const num = parseFloat(distStr);
+                return !isNaN(num) && num >= 0;
             }
 
+
             function formatSecondsToHHMMSS(totalSeconds) {
-                if (isNaN(totalSeconds) || totalSeconds === 0) return "00:00:00";
+                if (isNaN(totalSeconds) || totalSeconds <= 0) return "00:00:00";
                 const hours = Math.floor(totalSeconds / 3600);
                 const minutes = Math.floor((totalSeconds % 3600) / 60);
                 const seconds = Math.floor(totalSeconds % 60);
@@ -221,7 +263,6 @@
                     let dayCounterForWeek = 0;
                     plannedWorkouts.forEach(workout => { if(workout) dayCounterForWeek++; });
 
-
                     daysOfWeek.forEach((dayName, dayIndex) => {
                         const plannedWorkout = plannedWorkouts[dayIndex];
                         if (plannedWorkout) {
@@ -229,56 +270,76 @@
                             const log = runLogData[runId] || { completed: false, actualTime: '', actualDistance: '', comments: '', calculatedPace: '--:-- /km' };
                             const isCurrentActualWeek = weekData.week === currentDisplayWeek;
                             const exactDateStr = getFormattedDate(weekStartDate, dayIndex);
+                            const isRestDay = plannedWorkout.toLowerCase().startsWith("rest");
                             
                             const row = document.createElement('tr');
-                            row.className = `border-b border-slate-200 ${isCurrentActualWeek ? 'bg-teal-50' : ''} ${log.completed ? 'completed-run' : ''}`;
+                            let rowBgClass = '';
+                            if (!isRestDay) {
+                                rowBgClass = log.completed ? 'bg-green-100' : 'bg-yellow-100';
+                            } else if (isCurrentActualWeek) {
+                                rowBgClass = 'bg-teal-50'; // Current week rest days
+                            }
+                            // Non-current rest days will have default white/slate bg
+
+                            row.className = `border-b border-slate-200 ${rowBgClass}`;
+                            if (log.completed && !isRestDay) {
+                                row.classList.add('completed-run');
+                            }
                             
                             let rowHTML = '';
-                            if (isFullView && dayIndex === 0) {
+                            if (isFullView) {
                                 const firstDayWithWorkoutIndex = plannedWorkouts.findIndex(w => w);
                                 if (dayIndex === firstDayWithWorkoutIndex) {
                                      rowHTML += `<td rowspan="${dayCounterForWeek}" class="p-3 font-semibold table-cell-top text-center border-r border-slate-200">${weekData.week}</td>`;
                                 }
                             }
                             rowHTML += `<td class="p-3 font-semibold text-slate-600 table-cell-top">${exactDateStr}</td>`;
-                            rowHTML += `<td class="p-3 space-y-3">
-                                <div class="flex items-start gap-3">
-                                    <input type="checkbox" id="${runId}-completed" data-runid="${runId}" class="run-checkbox-completed h-5 w-5 mt-1 rounded border-gray-400 text-teal-600 focus:ring-teal-500 cursor-pointer" ${log.completed ? 'checked' : ''}>
-                                    <label for="${runId}-completed" class="flex-1 font-medium text-slate-800 cursor-pointer">${plannedWorkout}</label>
-                                </div>
-                                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 pl-8">
-                                    <div>
-                                        <label for="${runId}-time" class="block text-xs font-medium text-slate-500 mb-1">Time Ran</label>
-                                        <input type="text" id="${runId}-time" data-runid="${runId}" value="${log.actualTime}" placeholder="HH:MM:SS" class="actual-time-input input-sm w-full">
+                            
+                            if (isRestDay) {
+                                rowHTML += `<td class="p-3">
+                                    <span class="font-medium text-slate-800">${plannedWorkout}</span>
+                                </td>`;
+                            } else {
+                                rowHTML += `<td class="p-3 space-y-3">
+                                    <div class="flex items-start gap-3">
+                                        <input type="checkbox" id="${runId}-completed" data-runid="${runId}" class="run-checkbox-completed h-5 w-5 mt-1 rounded border-gray-400 text-teal-600 focus:ring-teal-500 cursor-pointer" ${log.completed ? 'checked' : ''}>
+                                        <label for="${runId}-completed" class="flex-1 font-medium text-slate-800 cursor-pointer">${plannedWorkout}</label>
                                     </div>
-                                    <div>
-                                        <label for="${runId}-dist" class="block text-xs font-medium text-slate-500 mb-1">Distance (km)</label>
-                                        <input type="number" id="${runId}-dist" data-runid="${runId}" value="${log.actualDistance}" step="0.01" placeholder="e.g., 5.25" class="actual-distance-input input-sm w-full">
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 pl-8">
+                                        <div>
+                                            <label for="${runId}-time" class="block text-xs font-medium text-slate-500 mb-1">Time Ran</label>
+                                            <input type="text" id="${runId}-time" data-runid="${runId}" value="${log.actualTime || ''}" placeholder="HH:MM:SS" class="actual-time-input input-sm w-full">
+                                        </div>
+                                        <div>
+                                            <label for="${runId}-dist" class="block text-xs font-medium text-slate-500 mb-1">Distance (km)</label>
+                                            <input type="number" id="${runId}-dist" data-runid="${runId}" value="${log.actualDistance || ''}" step="0.01" placeholder="e.g., 5.25" class="actual-distance-input input-sm w-full">
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-medium text-slate-500 mb-1">Actual Pace</label>
+                                            <span id="${runId}-pace" class="calculated-pace block p-1.5 text-sm ${log.calculatedPace === '--:-- /km' || !log.calculatedPace ? 'pace-greyed' : 'font-semibold text-slate-700'}">${log.calculatedPace || '--:-- /km'}</span>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <label class="block text-xs font-medium text-slate-500 mb-1">Actual Pace</label>
-                                        <span id="${runId}-pace" class="calculated-pace block p-1.5 text-sm ${log.calculatedPace === '--:-- /km' ? 'pace-greyed' : 'font-semibold text-slate-700'}">${log.calculatedPace || '--:-- /km'}</span>
+                                    <div class="pl-8">
+                                        <label for="${runId}-comments" class="block text-xs font-medium text-slate-500 mb-1">Comments</label>
+                                        <textarea id="${runId}-comments" data-runid="${runId}" placeholder="How was the run? Any notes..." class="actual-comments-input input-sm w-full text-xs" rows="2">${log.comments || ''}</textarea>
                                     </div>
-                                </div>
-                                <div class="pl-8">
-                                    <label for="${runId}-comments" class="block text-xs font-medium text-slate-500 mb-1">Comments</label>
-                                    <textarea id="${runId}-comments" data-runid="${runId}" placeholder="How was the run? Any notes..." class="actual-comments-input input-sm w-full text-xs" rows="2">${log.comments}</textarea>
-                                </div>
-                            </td>`;
+                                </td>`;
+                            }
                             
                             row.innerHTML = rowHTML;
                             tbody.appendChild(row);
                         }
                     });
 
-                    if (weekData.motivation || isFullView) { // Always add summary row in full view
+                    if (weekData.motivation || isFullView) {
                          const summaryAndMotivationRow = document.createElement('tr');
-                         summaryAndMotivationRow.className = `border-b-2 border-slate-300 ${weekData.week === currentDisplayWeek ? 'bg-teal-50' : 'bg-slate-100'}`;
+                         let summaryBgClass = (weekData.week === currentDisplayWeek && !isFullView) ? 'bg-teal-50' : 'bg-slate-100'; // Keep current week teal in single view
+                         summaryAndMotivationRow.className = `border-b-2 border-slate-300 ${summaryBgClass}`;
                          let smHTML = '';
                          if (isFullView) smHTML += `<td class="p-3"></td>`;
-                         smHTML += `<td colspan="${isFullView ? 2 : 3}" class="p-3">
-                                        <div class="text-xs weekly-summary-text mb-1" id="week-${weekData.week}-summary">Loading summary...</div>
-                                        ${weekData.motivation ? `<div class="motivational-text text-center text-sm">${weekData.motivation}</div>` : ''}
+                         smHTML += `<td colspan="${isFullView ? 2 : 3}" class="p-3 weekly-summary-row">
+                                        <div id="week-${weekData.week}-summary-visuals" class="mb-2"></div>
+                                        ${weekData.motivation ? `<div class="motivational-text text-center">${weekData.motivation}</div>` : ''}
                                     </td>`;
                          summaryAndMotivationRow.innerHTML = smHTML;
                          tbody.appendChild(summaryAndMotivationRow);
@@ -295,7 +356,17 @@
                 }
                 runLogData[runId][field] = value;
 
+                const rowElement = document.getElementById(`${runId}-completed`)?.closest('tr');
+                const timeInputEl = document.getElementById(`${runId}-time`);
+                const distInputEl = document.getElementById(`${runId}-dist`);
+
                 if (field === 'actualTime' || field === 'actualDistance') {
+                    const validTime = parseTimeToSeconds(runLogData[runId].actualTime) !== -1 || !runLogData[runId].actualTime;
+                    const validDist = isValidDistance(runLogData[runId].actualDistance);
+
+                    if(timeInputEl) timeInputEl.classList.toggle('input-error', parseTimeToSeconds(runLogData[runId].actualTime) === -1 && runLogData[runId].actualTime !== '');
+                    if(distInputEl) distInputEl.classList.toggle('input-error', !isValidDistance(runLogData[runId].actualDistance) && runLogData[runId].actualDistance !== '');
+                    
                     const newPace = calculatePace(runLogData[runId].actualTime, runLogData[runId].actualDistance);
                     runLogData[runId].calculatedPace = newPace;
                     const paceEl = document.getElementById(`${runId}-pace`);
@@ -307,39 +378,51 @@
                     }
                 }
                 
-                if (field === 'completed') {
-                     const rowElement = document.getElementById(`${runId}-completed`).closest('tr');
-                     if(rowElement) rowElement.classList.toggle('completed-run', value);
+                if (field === 'completed' && rowElement) {
+                    const plannedWorkoutText = rowElement.querySelector('label[for$="-completed"]')?.textContent || "";
+                    const isRestDay = plannedWorkoutText.toLowerCase().startsWith("rest");
+                    
+                    rowElement.classList.toggle('completed-run', value && !isRestDay);
+                    rowElement.classList.remove('bg-yellow-100', 'bg-green-100', 'bg-teal-50');
+                    
+                    const weekNumberFromRunId = parseInt(runId.match(/w(\d+)/)[1]);
+                    const isCurrentActualWeek = weekNumberFromRunId === currentWeekNumberGlobal;
+
+                    if (!isRestDay) {
+                        rowElement.classList.add(value ? 'bg-green-100' : 'bg-yellow-100');
+                    } else if (isCurrentActualWeek) {
+                         rowElement.classList.add('bg-teal-50');
+                    }
                 }
 
                 saveRunLogData();
                 const weekNumber = parseInt(runId.match(/w(\d+)/)[1]);
                 const weekPlan = trainingPlanData.find(w => w.week === weekNumber);
-                if(weekPlan) updateWeeklySummaryDisplay(weekNumber, weekPlan.totalKm);
+                if(weekPlan) {
+                    updateWeeklySummaryDisplay(weekNumber, weekPlan.totalKm);
+                    renderChart(); // Re-render chart to update actuals
+                }
             }
 
             function attachInputListeners() {
-                planContainer.querySelectorAll('.run-checkbox-completed, .actual-time-input, .actual-distance-input, .actual-comments-input').forEach(input => {
-                    const eventType = input.type === 'checkbox' ? 'change' : 'blur';
-                    input.addEventListener(eventType, (e) => {
+                planContainer.addEventListener('change', function(e) {
+                    if (e.target.classList.contains('run-checkbox-completed')) {
                         const runId = e.target.dataset.runid;
-                        let field, value;
-                        if (e.target.classList.contains('run-checkbox-completed')) {
-                            field = 'completed';
-                            value = e.target.checked;
-                        } else if (e.target.classList.contains('actual-time-input')) {
-                            field = 'actualTime';
-                            value = e.target.value;
-                        } else if (e.target.classList.contains('actual-distance-input')) {
-                            field = 'actualDistance';
-                            value = e.target.value;
-                        } else if (e.target.classList.contains('actual-comments-input')) {
-                            field = 'comments';
-                            value = e.target.value;
-                        }
-                        if (field) updateRunDataAndUI(runId, field, value);
-                    });
+                        updateRunDataAndUI(runId, 'completed', e.target.checked);
+                    }
                 });
+                planContainer.addEventListener('blur', function(e) {
+                    const target = e.target;
+                    let field = null;
+                    if (target.classList.contains('actual-time-input')) field = 'actualTime';
+                    else if (target.classList.contains('actual-distance-input')) field = 'actualDistance';
+                    else if (target.classList.contains('actual-comments-input')) field = 'comments';
+                    
+                    if (field) {
+                        const runId = target.dataset.runid;
+                        updateRunDataAndUI(runId, field, target.value);
+                    }
+                }, true); 
             }
             
             function updateWeeklySummaryDisplay(weekNumber, plannedKm) {
@@ -349,15 +432,22 @@
                 for (const runId in runLogData) {
                     if (runId.startsWith(`w${weekNumber}d`)) {
                         const log = runLogData[runId];
-                        if (log.actualDistance) totalActualDistance += parseFloat(log.actualDistance) || 0;
-                        if (log.actualTime) totalActualSeconds += parseTimeToSeconds(log.actualTime);
+                        if (log.actualDistance && isValidDistance(log.actualDistance)) totalActualDistance += parseFloat(log.actualDistance) || 0;
+                        if (log.actualTime && parseTimeToSeconds(log.actualTime) !== -1) totalActualSeconds += parseTimeToSeconds(log.actualTime);
                     }
                 }
-                const summaryEl = document.getElementById(`week-${weekNumber}-summary`);
-                if (summaryEl) {
-                    summaryEl.innerHTML = `<strong>Weekly Totals:</strong> 
-                        Distance: ${totalActualDistance.toFixed(2)}km / ${plannedKm}km planned. 
-                        Time: ${formatSecondsToHHMMSS(totalActualSeconds)}.`;
+                const summaryVisualsEl = document.getElementById(`week-${weekNumber}-summary-visuals`);
+                if (summaryVisualsEl) {
+                    const percentage = plannedKm > 0 ? Math.min(100, (totalActualDistance / plannedKm) * 100) : 0;
+                    summaryVisualsEl.innerHTML = `
+                        <div class="weekly-summary-details">
+                            <span>Distance: ${totalActualDistance.toFixed(2)}km / ${plannedKm}km planned</span>
+                            <span>Time: ${formatSecondsToHHMMSS(totalActualSeconds)}</span>
+                        </div>
+                        <div class="progress-bar-container mt-1">
+                            <div class="progress-bar" style="width: ${percentage.toFixed(1)}%;">${percentage.toFixed(0)}%</div>
+                        </div>
+                    `;
                 }
             }
 
@@ -368,9 +458,7 @@
                 
                 const table = createTable(dataToDisplay, isFull, currentWeekNumberGlobal);
                 planContainer.appendChild(table);
-                attachInputListeners(); // Re-attach listeners after table is built
                 
-                // Initial update of summaries for all visible weeks
                 dataToDisplay.forEach(weekData => {
                     updateWeeklySummaryDisplay(weekData.week, weekData.totalKm);
                 });
@@ -415,29 +503,94 @@
             }
 
             function renderChart() {
+                const today = new Date();
+                const actualKms = trainingPlanData.map(weekData => {
+                    let weeklyActual = 0;
+                    const weekStartDateForCalc = new Date(planStartDate);
+                    weekStartDateForCalc.setDate(weekStartDateForCalc.getDate() + (weekData.week - 1) * 7);
+                    const weekEndDateForCalc = new Date(weekStartDateForCalc);
+                    weekEndDateForCalc.setDate(weekEndDateForCalc.getDate() + 6);
+
+                    if (weekEndDateForCalc < today || weekData.week === currentWeekNumberGlobal) { // Only calculate for past or current weeks
+                        for (let i = 0; i < 7; i++) {
+                            const runId = `w${weekData.week}d${i}`;
+                            if (runLogData[runId] && runLogData[runId].actualDistance && isValidDistance(runLogData[runId].actualDistance)) {
+                                weeklyActual += parseFloat(runLogData[runId].actualDistance);
+                            }
+                        }
+                    }
+                    return weeklyActual;
+                });
+
+                const actualKmColors = trainingPlanData.map((weekData, index) => {
+                    const weekStartDateForCalc = new Date(planStartDate);
+                    weekStartDateForCalc.setDate(weekStartDateForCalc.getDate() + (weekData.week - 1) * 7);
+                    const weekEndDateForCalc = new Date(weekStartDateForCalc);
+                    weekEndDateForCalc.setDate(weekEndDateForCalc.getDate() + 6);
+
+                    if (weekEndDateForCalc < today) { // Past weeks only for color coding
+                        const planned = weekData.totalKm;
+                        const actual = actualKms[index];
+                        if (planned === 0 && actual > 0) return 'rgba(74, 222, 128, 0.7)'; // Green if any running on 0km plan
+                        if (planned === 0) return 'rgba(203, 213, 225, 0.5)'; // Neutral for 0km planned, 0km actual
+                        const percentage = (actual / planned);
+                        if (percentage >= 0.95) return 'rgba(74, 222, 128, 0.7)'; // Green
+                        if (percentage >= 0.70) return 'rgba(251, 146, 60, 0.7)'; // Orange
+                        return 'rgba(239, 68, 68, 0.7)'; // Red
+                    }
+                    return 'rgba(100, 116, 139, 0.5)'; // Default/Current/Future weeks actuals color (slate)
+                });
+
+
                 const ctx = document.getElementById('mileageChart').getContext('2d');
-                new Chart(ctx, {
+                if (mileageChartInstance) {
+                    mileageChartInstance.destroy();
+                }
+                mileageChartInstance = new Chart(ctx, {
                     type: 'bar',
                     data: {
                         labels: trainingPlanData.map(w => `Wk ${w.week}`),
-                        datasets: [{
-                            label: 'Planned KM',
-                            data: trainingPlanData.map(w => w.totalKm),
-                            backgroundColor: trainingPlanData.map(w => w.week === currentWeekNumberGlobal ? 'rgba(13, 148, 136, 0.8)' : 'rgba(13, 148, 136, 0.4)'),
-                            borderColor: trainingPlanData.map(w => w.week === currentWeekNumberGlobal ? 'rgba(13, 148, 136, 1)' : 'rgba(13, 148, 136, 0.6)'),
-                            borderWidth: 1,
-                            hoverBackgroundColor: 'rgba(13, 148, 136, 1)',
-                        }]
+                        datasets: [
+                            {
+                                label: 'Planned KM',
+                                data: trainingPlanData.map(w => w.totalKm),
+                                backgroundColor: trainingPlanData.map(w => w.week === currentWeekNumberGlobal ? 'rgba(13, 148, 136, 0.8)' : 'rgba(13, 148, 136, 0.4)'),
+                                borderColor: trainingPlanData.map(w => w.week === currentWeekNumberGlobal ? 'rgba(13, 148, 136, 1)' : 'rgba(13, 148, 136, 0.6)'),
+                                borderWidth: 1,
+                                order: 2
+                            },
+                            {
+                                label: 'Actual KM',
+                                data: actualKms,
+                                backgroundColor: actualKmColors,
+                                borderColor: actualKmColors.map(color => color.replace('0.7', '1').replace('0.5','0.8')), // Darker border
+                                borderWidth: 1,
+                                order: 1
+                            }
+                        ]
                     },
                     options: {
                         responsive: true, maintainAspectRatio: false,
-                        scales: { y: { beginAtZero: true, title: { display: true, text: 'Kilometers' } }, x: { grid: { display: false } } },
-                        plugins: { legend: { display: false }, tooltip: { callbacks: { title: (ctx) => ctx[0].label, label: (ctx) => `Planned: ${ctx.raw} km` }}}
+                        scales: { 
+                            y: { beginAtZero: true, title: { display: true, text: 'Kilometers' } }, 
+                            x: { grid: { display: false } } 
+                        },
+                        plugins: { 
+                            legend: { display: true, position: 'top'}, 
+                            tooltip: { 
+                                mode: 'index',
+                                intersect: false,
+                                callbacks: { 
+                                    title: (ctx) => ctx[0].label,
+                                }
+                            }
+                        }
                     }
                 });
             }
-
-            renderPlan(false);
+            
+            attachInputListeners(); 
+            renderPlan(false); 
             startCountdown();
             renderChart();
         });
