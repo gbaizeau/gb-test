@@ -11,15 +11,13 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     
-    <!-- Firebase SDKs -->
     <script type="module">
-        // Import the functions you need from the SDKs you need
-        // These are now imported directly in the main script block
+        // Firebase SDKs are imported directly in the main script block
     </script>
 
     <!-- Chosen Palette: Slate & Teal -->
     <!-- Application Structure Plan: A dashboard layout is used to provide an at-a-glance overview. The left column contains key stats (countdown, paces) and a visual chart of weekly effort, providing constant context. The main right column dynamically displays the training plan, defaulting to "This Week's" workouts for immediate relevance. This structure was chosen to transform the static plan into an active, daily tool. Users can easily see what they need to do today, track their progress visually, and switch to the full plan for future planning, making the information highly consumable and user-friendly. -->
-    <!-- Visualization & Content Choices: Weekly KM (Report Info) -> Goal: Visualize training load -> Viz: Bar Chart (Chart.js) -> Interaction: Hover for details -> Justification: Clearly shows workload progression and taper. | Training Schedule (Report Info) -> Goal: Present daily workouts clearly -> Viz: Interactive HTML Table -> Interaction: JS highlights current week, checkboxes mark completion, input fields for actuals, collapsible rows -> Justification: Makes the plan an active tracking and logging tool, improving scannability. | Race Date (Report Info) -> Goal: Build motivation -> Viz: Countdown Timer -> Interaction: None -> Justification: Creates a sense of urgency and excitement. -->
+    <!-- Visualization & Content Choices: Weekly KM (Report Info) -> Goal: Visualize training load -> Viz: Bar Chart (Chart.js) -> Interaction: Hover for details -> Justification: Clearly shows workload progression and taper. | Training Schedule (Report Info) -> Goal: Present daily workouts clearly -> Viz: Interactive HTML Table -> Interaction: JS highlights current week, checkboxes mark completion/skipped, input fields for actuals, collapsible rows -> Justification: Makes the plan an active tracking and logging tool, improving scannability. | Race Date (Report Info) -> Goal: Build motivation -> Viz: Countdown Timer -> Interaction: None -> Justification: Creates a sense of urgency and excitement. -->
     <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
     <style>
         body { font-family: 'Inter', sans-serif; }
@@ -39,10 +37,20 @@
             }
         }
         .table-cell-top { vertical-align: top; }
-        .completed-run > div > label:first-of-type { 
+        
+        .run-log-label { 
+             transition: opacity 0.3s ease, text-decoration 0.3s ease;
+        }
+        .completed-run .run-log-label { 
             text-decoration: line-through;
             opacity: 0.7;
         }
+         .skipped-run .run-log-label {
+            text-decoration: line-through;
+            opacity: 0.5;
+            color: #64748b; /* slate-500 */
+        }
+
         .motivational-text {
             font-style: italic;
             color: #0d9488; /* teal-600 */
@@ -61,8 +69,8 @@
             box-shadow: 0 0 0 1px #ef4444;
         }
         .weekly-summary-row td {
-            padding-top: 0.75rem !important;
-            padding-bottom: 0.75rem !important;
+            padding-top: 1rem !important; 
+            padding-bottom: 1rem !important; 
             font-weight: 600;
         }
         .pace-greyed {
@@ -70,35 +78,43 @@
         }
         .bg-custom-yellow { background-color: #fff3cc; } 
         .bg-teal-50 { background-color: #f0fdfa; } 
+        .bg-slate-200-opacity { background-color: rgba(226, 232, 240, 0.7); } 
+
 
         .progress-bar-container {
             width: 100%;
-            background-color: #e2e8f0; /* slate-200 */
-            border-radius: 0.375rem; /* rounded-md */
-            height: 1.25rem; /* h-5 */
+            background-color: #e2e8f0; 
+            border-radius: 0.5rem; 
+            height: 1.5rem; 
             overflow: hidden;
             margin-bottom: 0.25rem;
+            box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);
         }
         .progress-bar {
-            background-color: #10b981; /* emerald-500 */
+            background-color: #10b981; 
             height: 100%;
             text-align: center;
-            line-height: 1.25rem; 
+            line-height: 1.5rem; 
             color: white;
-            font-size: 0.75rem; 
+            font-size: 0.875rem; 
             font-weight: bold;
-            transition: width 0.3s ease-in-out;
+            transition: width 0.5s ease-in-out;
+            border-radius: 0.375rem 0 0 0.375rem; 
+        }
+        .progress-bar.full {
+             border-radius: 0.375rem; 
         }
         .weekly-summary-details {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            font-size: 0.875rem;
+            font-size: 0.95rem; 
+            margin-bottom: 0.5rem;
         }
         .run-details-collapsible {
             display: none; 
-            padding-left: 2.5rem; 
-            margin-top: 0.5rem;
+            padding-left: 2.75rem; 
+            margin-top: 0.75rem;
         }
         .run-details-collapsible.expanded {
             display: block;
@@ -129,6 +145,32 @@
         }
         .read-only-log strong {
             color: #475569; /* slate-600 */
+        }
+        .today-run-highlight {
+            border-left: 4px solid #2dd4bf; /* teal-400 */
+            background-color: #ccfbf1 !important; /* teal-100, more prominent */
+        }
+        .milestone-badge {
+            background-color: #facc15; /* yellow-400 */
+            color: #713f12; /* yellow-900 */
+            padding: 0.1rem 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.7rem;
+            font-weight: bold;
+            margin-left: 0.5rem;
+            vertical-align: middle;
+        }
+        .skip-btn {
+            background-color: #f87171; /* red-400 */
+            color: white;
+            padding: 0.1rem 0.4rem;
+            font-size: 0.7rem;
+            border-radius: 0.25rem;
+            cursor: pointer;
+            margin-left: 0.5rem;
+        }
+        .skip-btn:hover {
+            background-color: #ef4444; /* red-500 */
         }
     </style>
 </head>
@@ -188,6 +230,18 @@
                     </div>
                 </section>
 
+                 <section class="bg-white p-6 rounded-2xl shadow-sm">
+                    <h2 class="text-xl font-bold text-slate-900 mb-3">Training & Race Tips 💡</h2>
+                    <ul class="space-y-3 text-sm text-slate-600 list-disc list-inside">
+                        <li><strong>Nutrition:</strong> Practice your race day fueling strategy on long runs. Don't try anything new on race day! Aim for 30-60g of carbs per hour.</li>
+                        <li><strong>Hydration:</strong> Drink water consistently throughout the day, especially before, during, and after runs. Consider electrolytes for long runs.</li>
+                        <li><strong>Rest & Recovery:</strong> Sleep is crucial for muscle repair and energy. Aim for 7-9 hours. Listen to your body; take extra rest if needed.</li>
+                        <li><strong>Pacing:</strong> Start your marathon slightly slower than your goal pace. Don't get carried away by the race day excitement!</li>
+                        <li><strong>Race Day Gear:</strong> Wear comfortable, tested shoes and clothing. Nothing new! Prepare for different weather conditions.</li>
+                        <li><strong>Mental Game:</strong> Visualize success. Break the race into smaller, manageable segments. Stay positive!</li>
+                    </ul>
+                </section>
+
             </aside>
 
             <div class="lg:col-span-2">
@@ -236,13 +290,13 @@
             { week: 3, dates: "Sep 9 - Sep 15", totalKm: 44, mon: "Rest", tue: "ER 10km + 4 Strides", wed: "Rest or XT", thu: "MP Run: 2km WU, 8km @ MP (5:41/km), 2km CD (12km total)", fri: "Rest", sat: "LR 22km", sun: "Rest or RR 3-5km", motivation: "First taste of Marathon Pace. You got this!" },
             { week: 4, dates: "Sep 16 - Sep 22", totalKm: 37, mon: "Rest", tue: "ER 8km", wed: "Rest or XT", thu: "TR: 2km WU, 5km @ Tempo (5:15-5:25/km), 2km CD (9km total)", fri: "Rest", sat: "LR 20km", sun: "Rest or RR 3-5km", motivation: "Solid week. Recover well, you're earning it." },
             { week: 5, dates: "Sep 23 - Sep 29", totalKm: 49, mon: "Rest", tue: "IT: 2km WU, 5x1km @ ~5:00-5:10/km (400m jog recovery), 2km CD (approx 11km total)", wed: "Rest or XT or RR 5km", thu: "ER 12km + 4 Strides", fri: "Rest", sat: "LR 26km", sun: "Rest", motivation: "Stepping up the intensity. Feel that strength!" },
-            { week: 6, dates: "Sep 30 - Oct 6", totalKm: 54, mon: "Rest", tue: "ER 10km", wed: "Rest or XT", thu: "MP Run: 2km WU, 10km @ MP (5:41/km), 2km CD (14km total)", fri: "Rest", sat: "LR 30km", sun: "Rest or RR 5km", motivation: "30km! Huge milestone. Believe in your progress." },
+            { week: 6, dates: "Sep 30 - Oct 6", totalKm: 54, mon: "Rest", tue: "ER 10km", wed: "Rest or XT", thu: "MP Run: 2km WU, 10km @ MP (5:41/km), 2km CD (14km total)", fri: "Rest", sat: "LR 30km", sun: "Rest or RR 5km", motivation: "30km! 🎉 Huge milestone. Believe in your progress.", milestone: "Longest Run Prep" },
             { week: 7, dates: "Oct 7 - Oct 13", totalKm: 46, mon: "Rest", tue: "TR: 2km WU, 6km @ Tempo (5:15-5:25/km), 2km CD (10km total)", wed: "Rest or XT or RR 5km", thu: "ER 12km + 4 Strides", fri: "Rest", sat: "LR 24km (include 6-8km @ MP mid-run)", sun: "Rest", motivation: "Mixing it up. Stay focused and trust the process." },
-            { week: 8, dates: "Oct 14 - Oct 20", totalKm: 54, mon: "Rest", tue: "IT: 7-8x800m @ ~3:52-4:00 (400m jog recovery), 2km CD (approx 11-12km total)", wed: "Rest or XT or RR 5km", thu: "ER 10km", fri: "Rest", sat: "LR 32km", sun: "Rest", motivation: "Longest run done! You're so ready for this." },
+            { week: 8, dates: "Oct 14 - Oct 20", totalKm: 54, mon: "Rest", tue: "IT: 7-8x800m @ ~3:52-4:00 (400m jog recovery), 2km CD (approx 11-12km total)", wed: "Rest or XT or RR 5km", thu: "ER 10km", fri: "Rest", sat: "LR 32km", sun: "Rest", motivation: "Longest run done! 💪 You're so ready for this.", milestone: "Peak Long Run" },
             { week: 9, dates: "Oct 21 - Oct 27", totalKm: 38, mon: "Rest", tue: "ER 8km", wed: "Rest or XT", thu: "MP Run: 2km WU, 6km @ MP (5:41/km), 2km CD (10km total)", fri: "Rest", sat: "LR 20km", sun: "Rest or RR 3-5km", motivation: "Taper time. Let your body absorb all that hard work." },
             { week: 10, dates: "Oct 28 - Nov 3", totalKm: 32, mon: "Rest", tue: "IT: 2km WU, 4x800m @ ~3:52-4:00 (400m jog recovery), 2km CD (approx 8km total)", wed: "Rest or XT or RR 3km", thu: "ER 8km + 4 Strides", fri: "Rest", sat: "LR 16km", sun: "Rest", motivation: "Stay sharp, stay rested. Nearly there!" },
             { week: 11, dates: "Nov 4 - Nov 10", totalKm: 21, mon: "Rest", tue: "ER 6km + 4 Strides", wed: "Rest or XT", thu: "ER 5km", fri: "Rest", sat: "LR 10km (very easy)", sun: "Rest", motivation: "Almost there. Visualize crossing that finish line!" },
-            { week: 12, dates: "Nov 11 - Nov 15", totalKm: 12, mon: "Rest/3k shakeout", tue: "ER 4-5km + strides", wed: "Rest", thu: "ER 2-3km", fri: "Rest", sat: "RACE DAY! 🏁", sun: "", motivation: "Race week! Enjoy every moment. You've earned this!" }
+            { week: 12, dates: "Nov 11 - Nov 15", totalKm: 12, mon: "Rest/3k shakeout", tue: "ER 4-5km + strides", wed: "Rest", thu: "ER 2-3km", fri: "Rest", sat: "RACE DAY! 🏁", sun: "", motivation: "Race week! Enjoy every moment. You've earned this!", milestone: "Race Day!" }
         ];
         let mileageChartInstance = null;
         let expandedState = JSON.parse(localStorage.getItem('expandedState_Amelie_v1')) || {}; 
@@ -383,10 +437,10 @@
                         runDate.setDate(runDate.getDate() + dayIndex);
                         runDate.setHours(0,0,0,0);
                         const runId = `w${weekData.week}d${dayIndex}`;
-                        const log = runLogData[runId] || { completed: false };
+                        const log = runLogData[runId] || { completed: false, status: 'pending' };
                         const isRestDay = plannedWorkout.toLowerCase().startsWith("rest");
 
-                        if (runDate >= today && !isRestDay && !log.completed) {
+                        if (runDate >= today && !isRestDay && log.status !== 'completed' && log.status !== 'skipped') {
                             return runId;
                         }
                     }
@@ -419,8 +473,24 @@
 
             const tbody = document.createElement('tbody');
             const nextUpcomingRunId = findNextUpcomingRunId();
+            const todayFormatted = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric'});
+
 
             dataToDisplay.forEach(weekData => {
+                if (isFullView) {
+                    const summaryRowTop = document.createElement('tr');
+                    let summaryBgClassTop = (weekData.week === currentDisplayWeek) ? 'bg-teal-50' : 'bg-slate-100';
+                    summaryRowTop.className = `border-t-2 border-b border-slate-300 ${summaryBgClassTop}`;
+                    let smHTMLTop = `<td class="p-3"></td>`; 
+                    smHTMLTop += `<td colspan="2" class="p-3 weekly-summary-row">
+                                    <div id="week-${weekData.week}-summary-visuals" class="mb-2"></div>
+                                    ${weekData.motivation ? `<div class="motivational-text text-center">${weekData.motivation}</div>` : ''}
+                                </td>`;
+                    summaryRowTop.innerHTML = smHTMLTop;
+                    tbody.appendChild(summaryRowTop);
+                }
+
+
                 const weekStartDate = new Date(planStartDate);
                 weekStartDate.setDate(weekStartDate.getDate() + (weekData.week - 1) * 7);
 
@@ -434,22 +504,25 @@
                     const plannedWorkout = plannedWorkouts[dayIndex];
                     if (plannedWorkout) {
                         const runId = `w${weekData.week}d${dayIndex}`;
-                        const log = runLogData[runId] || { completed: false, actualTime: '', actualDistance: '', comments: '', calculatedPace: '--:-- /km' };
+                        const log = runLogData[runId] || { status: 'pending', actualTime: '', actualDistance: '', comments: '', calculatedPace: '--:-- /km' };
                         const isCurrentActualWeek = weekData.week === currentDisplayWeek;
                         const exactDateStr = getFormattedDate(weekStartDate, dayIndex);
                         const isRestDay = plannedWorkout.toLowerCase().startsWith("rest");
+                        const isToday = exactDateStr === todayFormatted;
                         
                         const row = document.createElement('tr');
                         let rowBgClass = '';
                         if (!isRestDay) {
-                            rowBgClass = log.completed ? 'bg-teal-50' : 'bg-custom-yellow';
+                            if (log.status === 'completed') rowBgClass = 'bg-teal-50';
+                            else if (log.status === 'skipped') rowBgClass = 'bg-slate-200-opacity';
+                            else rowBgClass = 'bg-custom-yellow';
                         } else if (isCurrentActualWeek) {
                             rowBgClass = 'bg-teal-50'; 
                         }
                         
-                        row.className = `border-b border-slate-200 ${rowBgClass}`;
-                        if (log.completed && !isRestDay) {
-                            row.classList.add('completed-run');
+                        row.className = `border-b border-slate-200 ${rowBgClass} ${isToday && !isRestDay ? 'today-run-highlight' : ''}`;
+                        if ((log.status === 'completed' || log.status === 'skipped') && !isRestDay) {
+                            row.classList.add(log.status === 'completed' ? 'completed-run' : 'skipped-run');
                         }
                         
                         let rowHTML = '';
@@ -459,32 +532,40 @@
                                  rowHTML += `<td rowspan="${dayCounterForWeek}" class="p-3 font-semibold table-cell-top text-center border-r border-slate-200">${weekData.week}</td>`;
                             }
                         }
-                        rowHTML += `<td class="p-3 font-semibold text-slate-600 table-cell-top">${exactDateStr}</td>`;
+                        rowHTML += `<td class="p-3 font-semibold text-slate-600 table-cell-top ${isToday ? 'font-bold text-teal-700':''}">${exactDateStr} ${isToday ? ' (Today)' : ''}</td>`;
                         
                         if (isRestDay) {
                             rowHTML += `<td class="p-3">
                                 <span class="font-medium text-slate-800">${plannedWorkout}</span>
                             </td>`;
                         } else {
-                            const isExpanded = expandedState[runId] === undefined ? (runId === nextUpcomingRunId && !log.completed) : expandedState[runId];
-                            if (expandedState[runId] === undefined && runId === nextUpcomingRunId && !log.completed) expandedState[runId] = true;
+                            const isExpanded = expandedState[runId] === undefined ? (runId === nextUpcomingRunId && log.status !== 'completed' && log.status !== 'skipped') : expandedState[runId];
+                            if (expandedState[runId] === undefined && runId === nextUpcomingRunId && log.status !== 'completed' && log.status !== 'skipped') expandedState[runId] = true;
 
-                            if (currentUser) { // Logged in - Show editable fields
+                            let milestoneBadge = '';
+                            if (log.status === 'completed' && trainingPlanData[weekData.week-1].milestone && (plannedWorkout.includes("LR 30km") || plannedWorkout.includes("LR 32km") || plannedWorkout.includes("RACE DAY"))) {
+                                milestoneBadge = `<span class="milestone-badge">🎉 Milestone!</span>`;
+                            }
+
+
+                            if (currentUser) { 
                                 rowHTML += `<td class="p-3">
                                     <div class="flex items-start gap-1">
                                         <span class="toggle-details-btn" data-runid="${runId}">${isExpanded ? '−' : '+'}</span>
-                                        <input type="checkbox" id="${runId}-completed" data-runid="${runId}" class="run-checkbox-completed h-5 w-5 mt-1 rounded border-gray-400 text-teal-600 focus:ring-teal-500 cursor-pointer" ${log.completed ? 'checked' : ''}>
-                                        <label for="${runId}-completed" class="flex-1 font-medium text-slate-800 cursor-pointer">${plannedWorkout}</label>
+                                        <input type="checkbox" id="${runId}-completed" data-runid="${runId}" class="run-checkbox-completed h-5 w-5 mt-1 rounded border-gray-400 text-teal-600 focus:ring-teal-500 cursor-pointer" ${log.status === 'completed' ? 'checked' : ''} ${log.status === 'skipped' ? 'disabled' : ''}>
+                                        <label for="${runId}-completed" class="run-log-label flex-1 font-medium text-slate-800 cursor-pointer">${plannedWorkout}</label>
+                                        ${milestoneBadge}
+                                        ${log.status !== 'skipped' ? `<button class="skip-btn" data-runid="${runId}">Skip</button>` : '<span class="text-xs text-slate-500 ml-2">(Skipped)</span>'}
                                     </div>
                                     <div id="${runId}-details" class="run-details-collapsible ${isExpanded ? 'expanded' : ''}">
                                         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 mt-2">
                                             <div>
                                                 <label for="${runId}-time" class="block text-xs font-medium text-slate-500 mb-1">Time Ran</label>
-                                                <input type="text" id="${runId}-time" data-runid="${runId}" value="${log.actualTime || ''}" placeholder="HH:MM:SS or MM:SS" class="actual-time-input input-sm w-full">
+                                                <input type="text" id="${runId}-time" data-runid="${runId}" value="${log.actualTime || ''}" placeholder="HH:MM:SS or MM:SS" class="actual-time-input input-sm w-full" ${log.status === 'skipped' ? 'disabled' : ''}>
                                             </div>
                                             <div>
                                                 <label for="${runId}-dist" class="block text-xs font-medium text-slate-500 mb-1">Distance (km)</label>
-                                                <input type="number" id="${runId}-dist" data-runid="${runId}" value="${log.actualDistance || ''}" step="0.01" placeholder="e.g., 5.25" class="actual-distance-input input-sm w-full">
+                                                <input type="number" id="${runId}-dist" data-runid="${runId}" value="${log.actualDistance || ''}" step="0.01" placeholder="e.g., 5.25" class="actual-distance-input input-sm w-full" ${log.status === 'skipped' ? 'disabled' : ''}>
                                             </div>
                                             <div>
                                                 <label class="block text-xs font-medium text-slate-500 mb-1">Actual Pace</label>
@@ -493,23 +574,25 @@
                                         </div>
                                         <div class="mt-2">
                                             <label for="${runId}-comments" class="block text-xs font-medium text-slate-500 mb-1">Comments</label>
-                                            <textarea id="${runId}-comments" data-runid="${runId}" placeholder="How was the run? Any notes..." class="actual-comments-input input-sm w-full text-xs" rows="2">${log.comments || ''}</textarea>
+                                            <textarea id="${runId}-comments" data-runid="${runId}" placeholder="How was the run? Any notes..." class="actual-comments-input input-sm w-full text-xs" rows="2" ${log.status === 'skipped' ? 'disabled' : ''}>${log.comments || ''}</textarea>
                                         </div>
                                     </div>
                                 </td>`;
-                            } else { // Not logged in - Show read-only text
+                            } else { 
                                  rowHTML += `<td class="p-3">
                                     <div class="flex items-start gap-1">
                                         <span class="toggle-details-btn" data-runid="${runId}">${isExpanded ? '−' : '+'}</span>
-                                        <span class="h-5 w-5 mt-1 mr-1 text-slate-500 font-semibold">${log.completed ? '✓' : '○'}</span>
-                                        <label class="flex-1 font-medium text-slate-800">${plannedWorkout}</label>
+                                        <span class="h-5 w-5 mt-1 mr-1 text-slate-500 font-semibold">${log.status === 'completed' ? '✓' : (log.status === 'skipped' ? '⊘' : '○')}</span>
+                                        <label class="run-log-label flex-1 font-medium text-slate-800">${plannedWorkout}</label>
+                                        ${milestoneBadge}
+                                        ${log.status === 'skipped' ? '<span class="text-xs text-slate-500 ml-2">(Skipped)</span>' : ''}
                                     </div>
                                      <div id="${runId}-details" class="run-details-collapsible read-only-log ${isExpanded ? 'expanded' : ''}">
                                         ${log.actualTime ? `<span><strong>Time:</strong> ${log.actualTime}</span>` : ''}
                                         ${log.actualDistance ? `<span><strong>Distance:</strong> ${log.actualDistance} km</span>` : ''}
                                         ${log.calculatedPace && log.calculatedPace !== '--:-- /km' ? `<span><strong>Pace:</strong> ${log.calculatedPace}</span>` : ''}
                                         ${log.comments ? `<div class="mt-1"><strong>Comments:</strong><div class="italic text-slate-500 whitespace-pre-wrap">${log.comments}</div></div>` : ''}
-                                        ${!(log.actualTime || log.actualDistance || log.comments) ? '<span class="text-slate-400 text-xs">No details logged for this run.</span>' : ''}
+                                        ${!(log.actualTime || log.actualDistance || log.comments) && log.status !== 'skipped' ? '<span class="text-slate-400 text-xs">No details logged for this run.</span>' : ''}
                                     </div>
                                 </td>`;
                             }
@@ -519,21 +602,19 @@
                         tbody.appendChild(row);
                     }
                 });
-
-                if (weekData.motivation || isFullView) {
-                     const summaryAndMotivationRow = document.createElement('tr');
-                     let summaryBgClass = (weekData.week === currentDisplayWeek && !isFullView) ? 'bg-teal-50' : 'bg-slate-100';
-                     summaryAndMotivationRow.className = `border-b-2 border-slate-300 ${summaryBgClass}`;
-                     let smHTML = '';
-                     if (isFullView) smHTML += `<td class="p-3"></td>`;
-                     smHTML += `<td colspan="${isFullView ? 2 : 3}" class="p-3 weekly-summary-row">
-                                    <div id="week-${weekData.week}-summary-visuals" class="mb-2"></div>
-                                    ${weekData.motivation ? `<div class="motivational-text text-center">${weekData.motivation}</div>` : ''}
-                                </td>`;
-                     summaryAndMotivationRow.innerHTML = smHTML;
-                     tbody.appendChild(summaryAndMotivationRow);
-                     updateWeeklySummaryDisplay(weekData.week, weekData.totalKm);
+                
+                if (!isFullView && (weekData.motivation || true)) { 
+                     const summaryRowBottom = document.createElement('tr');
+                     let summaryBgClassBottom = (weekData.week === currentDisplayWeek) ? 'bg-teal-50' : 'bg-slate-100';
+                     summaryRowBottom.className = `border-t-2 border-b-2 border-slate-300 ${summaryBgClassBottom}`;
+                     let smHTMLBottom = `<td colspan="3" class="p-3 weekly-summary-row">
+                                        <div id="week-${weekData.week}-summary-visuals" class="mb-2"></div>
+                                        ${weekData.motivation ? `<div class="motivational-text text-center">${weekData.motivation}</div>` : ''}
+                                    </td>`;
+                     summaryRowBottom.innerHTML = smHTMLBottom;
+                     tbody.appendChild(summaryRowBottom);
                 }
+                 updateWeeklySummaryDisplay(weekData.week, weekData.totalKm); 
             });
             table.appendChild(tbody);
 
@@ -547,17 +628,29 @@
         
         async function updateRunDataAndUI(runId, field, value) {
             if (!runLogData[runId]) {
-                runLogData[runId] = { completed: false, actualTime: '', actualDistance: '', comments: '', calculatedPace: '--:-- /km' };
+                runLogData[runId] = { status: 'pending', actualTime: '', actualDistance: '', comments: '', calculatedPace: '--:-- /km' };
             }
             if (field === 'actualTime') {
                 value = typeof value === 'string' ? value.trim() : value;
             }
-            runLogData[runId][field] = value;
+            
+            if (field === 'status' && value === 'skipped') {
+                runLogData[runId].status = 'skipped';
+                runLogData[runId].completed = false; 
+            } else if (field === 'completed') {
+                 runLogData[runId].status = value ? 'completed' : 'pending';
+                 runLogData[runId].completed = value; 
+            } else {
+                runLogData[runId][field] = value;
+            }
+
 
             const rowElement = document.getElementById(`${runId}-completed`)?.closest('tr');
             const timeInputEl = document.getElementById(`${runId}-time`);
             const distInputEl = document.getElementById(`${runId}-dist`);
             const completedCheckbox = document.getElementById(`${runId}-completed`);
+            const commentsInputEl = document.getElementById(`${runId}-comments`);
+            const skipBtnEl = planContainer.querySelector(`.skip-btn[data-runid="${runId}"]`);
 
 
             if (field === 'actualTime' || field === 'actualDistance') {
@@ -574,38 +667,69 @@
                     paceEl.classList.toggle('text-slate-700', newPace !== '--:-- /km');
                 }
 
-                // Auto-tick if time and distance are valid
                 const timeVal = runLogData[runId].actualTime;
                 const distVal = runLogData[runId].actualDistance;
                 const timeIsEnteredAndValid = timeVal && parseTimeToSeconds(timeVal) !== -1;
                 const distIsEnteredAndValid = distVal && isValidDistance(distVal) && parseFloat(distVal) > 0;
 
-                if (timeIsEnteredAndValid && distIsEnteredAndValid && !runLogData[runId].completed) {
-                    runLogData[runId].completed = true; 
+                if (timeIsEnteredAndValid && distIsEnteredAndValid && runLogData[runId].status !== 'completed' && runLogData[runId].status !== 'skipped') {
+                    runLogData[runId].status = 'completed'; 
+                    runLogData[runId].completed = true;
                     if (completedCheckbox) completedCheckbox.checked = true; 
                     if (rowElement) {
-                        const plannedWorkoutText = rowElement.querySelector('label[for$="-completed"]')?.textContent || "";
+                        const plannedWorkoutText = rowElement.querySelector('label.run-log-label')?.textContent || "";
                         const isRestDay = plannedWorkoutText.toLowerCase().startsWith("rest");
                         if (!isRestDay) {
-                            rowElement.classList.remove('bg-custom-yellow');
+                            rowElement.classList.remove('bg-custom-yellow', 'bg-slate-200-opacity');
                             rowElement.classList.add('bg-teal-50', 'completed-run');
+                             if(skipBtnEl) skipBtnEl.style.display = 'none'; 
+                             if(timeInputEl) timeInputEl.disabled = false;
+                             if(distInputEl) distInputEl.disabled = false;
+                             if(commentsInputEl) commentsInputEl.disabled = false;
+
                         }
                     }
                 }
             }
             
-            if (field === 'completed' && rowElement) {
-                const plannedWorkoutText = rowElement.querySelector('label[for$="-completed"]')?.textContent || "";
+            if ((field === 'completed' || field === 'status') && rowElement) {
+                const plannedWorkoutText = rowElement.querySelector('label.run-log-label')?.textContent || "";
                 const isRestDay = plannedWorkoutText.toLowerCase().startsWith("rest");
                 
-                rowElement.classList.toggle('completed-run', value && !isRestDay);
-                rowElement.classList.remove('bg-custom-yellow', 'bg-teal-50'); 
+                rowElement.classList.remove('completed-run', 'skipped-run', 'bg-custom-yellow', 'bg-teal-50', 'bg-slate-200-opacity');
                 
                 const weekNumberFromRunId = parseInt(runId.match(/w(\d+)/)[1]);
                 const isCurrentActualWeek = weekNumberFromRunId === currentWeekNumberGlobal;
 
                 if (!isRestDay) {
-                    rowElement.classList.add(value ? 'bg-teal-50' : 'bg-custom-yellow'); 
+                    if (runLogData[runId].status === 'completed') {
+                        rowElement.classList.add('bg-teal-50', 'completed-run');
+                        if(skipBtnEl) skipBtnEl.style.display = 'none';
+                        if(timeInputEl) timeInputEl.disabled = false;
+                        if(distInputEl) distInputEl.disabled = false;
+                        if(commentsInputEl) commentsInputEl.disabled = false;
+
+                    } else if (runLogData[runId].status === 'skipped') {
+                        rowElement.classList.add('bg-slate-200-opacity', 'skipped-run');
+                        if(completedCheckbox) completedCheckbox.checked = false; completedCheckbox.disabled = true;
+                        if(skipBtnEl) skipBtnEl.style.display = 'none'; 
+                        if(timeInputEl) { timeInputEl.disabled = true; timeInputEl.value = ''; }
+                        if(distInputEl) { distInputEl.disabled = true; distInputEl.value = ''; }
+                        if(commentsInputEl) { commentsInputEl.disabled = true; commentsInputEl.value = ''; }
+                        runLogData[runId].actualTime = ''; runLogData[runId].actualDistance = ''; runLogData[runId].comments = ''; runLogData[runId].calculatedPace = '--:-- /km';
+                        const paceEl = document.getElementById(`${runId}-pace`);
+                        if (paceEl) paceEl.textContent = '--:-- /km';
+
+
+                    } else { // pending
+                        rowElement.classList.add('bg-custom-yellow');
+                        if(completedCheckbox) completedCheckbox.disabled = false;
+                        if(skipBtnEl) skipBtnEl.style.display = 'inline-block';
+                        if(timeInputEl) timeInputEl.disabled = false;
+                        if(distInputEl) distInputEl.disabled = false;
+                        if(commentsInputEl) commentsInputEl.disabled = false;
+
+                    }
                 } else if (isCurrentActualWeek) {
                      rowElement.classList.add('bg-teal-50');
                 }
@@ -623,8 +747,8 @@
         function attachInputListeners() {
             planContainer.addEventListener('change', function(e) {
                 if (e.target.classList.contains('run-checkbox-completed')) {
-                    if (!currentUser) { // Prevent interaction if not logged in
-                        e.target.checked = !e.target.checked; // Revert checkbox state
+                    if (!currentUser) { 
+                        e.target.checked = !e.target.checked; 
                         alert("Please sign in to log your runs.");
                         return;
                     }
@@ -634,7 +758,7 @@
             });
             planContainer.addEventListener('blur', function(e) {
                 const target = e.target;
-                 if (!currentUser) return; // Prevent interaction if not logged in
+                 if (!currentUser) return; 
 
                 let field = null;
                 let processedValue = target.value; 
@@ -664,6 +788,13 @@
                         expandedState[runId] = !isCurrentlyExpanded;
                         saveExpandedState();
                     }
+                } else if (e.target.classList.contains('skip-btn')) {
+                     if (!currentUser) {
+                        alert("Please sign in to modify run status.");
+                        return;
+                    }
+                    const runId = e.target.dataset.runid;
+                    updateRunDataAndUI(runId, 'status', 'skipped');
                 }
             });
         }
@@ -675,8 +806,12 @@
             for (const runId in runLogData) {
                 if (runId.startsWith(`w${weekNumber}d`)) {
                     const log = runLogData[runId];
-                    if (log.actualDistance && isValidDistance(log.actualDistance)) totalActualDistance += parseFloat(log.actualDistance) || 0;
-                    if (log.actualTime && parseTimeToSeconds(log.actualTime) !== -1) totalActualSeconds += parseTimeToSeconds(log.actualTime);
+                    if (log.status !== 'skipped' && log.actualDistance && isValidDistance(log.actualDistance)) {
+                        totalActualDistance += parseFloat(log.actualDistance) || 0;
+                    }
+                    if (log.status !== 'skipped' && log.actualTime && parseTimeToSeconds(log.actualTime) !== -1) {
+                        totalActualSeconds += parseTimeToSeconds(log.actualTime);
+                    }
                 }
             }
             const summaryVisualsEl = document.getElementById(`week-${weekNumber}-summary-visuals`);
@@ -688,7 +823,7 @@
                         <span>Time: ${formatSecondsToHHMMSS(totalActualSeconds)}</span>
                     </div>
                     <div class="progress-bar-container mt-1">
-                        <div class="progress-bar" style="width: ${percentage.toFixed(1)}%;">${percentage.toFixed(0)}%</div>
+                        <div class="progress-bar ${percentage === 100 ? 'full' : ''}" style="width: ${percentage.toFixed(1)}%;">${percentage.toFixed(0)}%</div>
                     </div>
                 `;
             }
@@ -768,7 +903,7 @@
                 let weeklyActual = 0;
                 for (let i = 0; i < 7; i++) { 
                     const runId = `w${weekData.week}d${i}`;
-                    if (runLogData[runId] && runLogData[runId].actualDistance && isValidDistance(runLogData[runId].actualDistance)) {
+                    if (runLogData[runId] && runLogData[runId].status !== 'skipped' && runLogData[runId].actualDistance && isValidDistance(runLogData[runId].actualDistance)) {
                         weeklyActual += parseFloat(runLogData[runId].actualDistance);
                     }
                 }
@@ -873,7 +1008,7 @@
                     unsubscribeFromFirestore(); 
                     unsubscribeFromFirestore = null;
                 }
-                loadRunLogDataFromFirestore(); // Load shared data for read-only view
+                loadRunLogDataFromFirestore(); 
                 
                 userNameSpan.textContent = '';
                 userInfoDiv.classList.add('hidden');
