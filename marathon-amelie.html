@@ -123,6 +123,13 @@
             box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
             z-index: 50;
         }
+        .read-only-log span {
+            display: block;
+            padding: 0.1rem 0;
+        }
+        .read-only-log strong {
+            color: #475569; /* slate-600 */
+        }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800">
@@ -257,10 +264,8 @@
         }
         
         async function saveRunLogDataToFirestore() {
-            if (!currentUser) { // Only allow writes if a user is logged in. Rules will enforce specific UIDs.
+            if (!currentUser) { 
                 console.warn("User not logged in. Cannot save data.");
-                // Optionally alert the user or disable input fields if not logged in with write permission.
-                // For this version, we rely on Firestore rules to block unauthorized writes.
             }
             try {
                 const docRef = doc(db, "runLogs", SHARED_RUN_LOG_DOC_ID);
@@ -464,33 +469,50 @@
                             const isExpanded = expandedState[runId] === undefined ? (runId === nextUpcomingRunId && !log.completed) : expandedState[runId];
                             if (expandedState[runId] === undefined && runId === nextUpcomingRunId && !log.completed) expandedState[runId] = true;
 
-                            rowHTML += `<td class="p-3">
-                                <div class="flex items-start gap-1">
-                                    <span class="toggle-details-btn" data-runid="${runId}">${isExpanded ? '−' : '+'}</span>
-                                    <input type="checkbox" id="${runId}-completed" data-runid="${runId}" class="run-checkbox-completed h-5 w-5 mt-1 rounded border-gray-400 text-teal-600 focus:ring-teal-500 cursor-pointer" ${log.completed ? 'checked' : ''}>
-                                    <label for="${runId}-completed" class="flex-1 font-medium text-slate-800 cursor-pointer">${plannedWorkout}</label>
-                                </div>
-                                <div id="${runId}-details" class="run-details-collapsible ${isExpanded ? 'expanded' : ''}">
-                                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 mt-2">
-                                        <div>
-                                            <label for="${runId}-time" class="block text-xs font-medium text-slate-500 mb-1">Time Ran</label>
-                                            <input type="text" id="${runId}-time" data-runid="${runId}" value="${log.actualTime || ''}" placeholder="HH:MM:SS or MM:SS" class="actual-time-input input-sm w-full">
+                            if (currentUser) { // Logged in - Show editable fields
+                                rowHTML += `<td class="p-3">
+                                    <div class="flex items-start gap-1">
+                                        <span class="toggle-details-btn" data-runid="${runId}">${isExpanded ? '−' : '+'}</span>
+                                        <input type="checkbox" id="${runId}-completed" data-runid="${runId}" class="run-checkbox-completed h-5 w-5 mt-1 rounded border-gray-400 text-teal-600 focus:ring-teal-500 cursor-pointer" ${log.completed ? 'checked' : ''}>
+                                        <label for="${runId}-completed" class="flex-1 font-medium text-slate-800 cursor-pointer">${plannedWorkout}</label>
+                                    </div>
+                                    <div id="${runId}-details" class="run-details-collapsible ${isExpanded ? 'expanded' : ''}">
+                                        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 mt-2">
+                                            <div>
+                                                <label for="${runId}-time" class="block text-xs font-medium text-slate-500 mb-1">Time Ran</label>
+                                                <input type="text" id="${runId}-time" data-runid="${runId}" value="${log.actualTime || ''}" placeholder="HH:MM:SS or MM:SS" class="actual-time-input input-sm w-full">
+                                            </div>
+                                            <div>
+                                                <label for="${runId}-dist" class="block text-xs font-medium text-slate-500 mb-1">Distance (km)</label>
+                                                <input type="number" id="${runId}-dist" data-runid="${runId}" value="${log.actualDistance || ''}" step="0.01" placeholder="e.g., 5.25" class="actual-distance-input input-sm w-full">
+                                            </div>
+                                            <div>
+                                                <label class="block text-xs font-medium text-slate-500 mb-1">Actual Pace</label>
+                                                <span id="${runId}-pace" class="calculated-pace block p-1.5 text-sm ${log.calculatedPace === '--:-- /km' || !log.calculatedPace ? 'pace-greyed' : 'font-semibold text-slate-700'}">${log.calculatedPace || '--:-- /km'}</span>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <label for="${runId}-dist" class="block text-xs font-medium text-slate-500 mb-1">Distance (km)</label>
-                                            <input type="number" id="${runId}-dist" data-runid="${runId}" value="${log.actualDistance || ''}" step="0.01" placeholder="e.g., 5.25" class="actual-distance-input input-sm w-full">
-                                        </div>
-                                        <div>
-                                            <label class="block text-xs font-medium text-slate-500 mb-1">Actual Pace</label>
-                                            <span id="${runId}-pace" class="calculated-pace block p-1.5 text-sm ${log.calculatedPace === '--:-- /km' || !log.calculatedPace ? 'pace-greyed' : 'font-semibold text-slate-700'}">${log.calculatedPace || '--:-- /km'}</span>
+                                        <div class="mt-2">
+                                            <label for="${runId}-comments" class="block text-xs font-medium text-slate-500 mb-1">Comments</label>
+                                            <textarea id="${runId}-comments" data-runid="${runId}" placeholder="How was the run? Any notes..." class="actual-comments-input input-sm w-full text-xs" rows="2">${log.comments || ''}</textarea>
                                         </div>
                                     </div>
-                                    <div class="mt-2">
-                                        <label for="${runId}-comments" class="block text-xs font-medium text-slate-500 mb-1">Comments</label>
-                                        <textarea id="${runId}-comments" data-runid="${runId}" placeholder="How was the run? Any notes..." class="actual-comments-input input-sm w-full text-xs" rows="2">${log.comments || ''}</textarea>
+                                </td>`;
+                            } else { // Not logged in - Show read-only text
+                                 rowHTML += `<td class="p-3">
+                                    <div class="flex items-start gap-1">
+                                        <span class="toggle-details-btn" data-runid="${runId}">${isExpanded ? '−' : '+'}</span>
+                                        <span class="h-5 w-5 mt-1 mr-1 text-slate-500 font-semibold">${log.completed ? '✓' : '○'}</span>
+                                        <label class="flex-1 font-medium text-slate-800">${plannedWorkout}</label>
                                     </div>
-                                </div>
-                            </td>`;
+                                     <div id="${runId}-details" class="run-details-collapsible read-only-log ${isExpanded ? 'expanded' : ''}">
+                                        ${log.actualTime ? `<span><strong>Time:</strong> ${log.actualTime}</span>` : ''}
+                                        ${log.actualDistance ? `<span><strong>Distance:</strong> ${log.actualDistance} km</span>` : ''}
+                                        ${log.calculatedPace && log.calculatedPace !== '--:-- /km' ? `<span><strong>Pace:</strong> ${log.calculatedPace}</span>` : ''}
+                                        ${log.comments ? `<div class="mt-1"><strong>Comments:</strong><div class="italic text-slate-500 whitespace-pre-wrap">${log.comments}</div></div>` : ''}
+                                        ${!(log.actualTime || log.actualDistance || log.comments) ? '<span class="text-slate-400 text-xs">No details logged for this run.</span>' : ''}
+                                    </div>
+                                </td>`;
+                            }
                         }
                         
                         row.innerHTML = rowHTML;
@@ -601,12 +623,19 @@
         function attachInputListeners() {
             planContainer.addEventListener('change', function(e) {
                 if (e.target.classList.contains('run-checkbox-completed')) {
+                    if (!currentUser) { // Prevent interaction if not logged in
+                        e.target.checked = !e.target.checked; // Revert checkbox state
+                        alert("Please sign in to log your runs.");
+                        return;
+                    }
                     const runId = e.target.dataset.runid;
                     updateRunDataAndUI(runId, 'completed', e.target.checked);
                 }
             });
             planContainer.addEventListener('blur', function(e) {
                 const target = e.target;
+                 if (!currentUser) return; // Prevent interaction if not logged in
+
                 let field = null;
                 let processedValue = target.value; 
                 if (target.classList.contains('actual-time-input')) {
@@ -836,7 +865,7 @@
                 userNameSpan.textContent = user.displayName || user.email;
                 userInfoDiv.classList.remove('hidden');
                 googleSigninBtn.classList.add('hidden');
-                planIntro.textContent = `Log your runs, ${user.displayName || 'runner'}! Progress is synced.`;
+                planIntro.textContent = `Log your runs, ${user.displayName || 'runner'}! Progress is synced to the shared plan.`;
                 loadRunLogDataFromFirestore(); 
             } else {
                 currentUser = null;
@@ -844,12 +873,12 @@
                     unsubscribeFromFirestore(); 
                     unsubscribeFromFirestore = null;
                 }
-                loadRunLogDataFromFirestore(); 
+                loadRunLogDataFromFirestore(); // Load shared data for read-only view
                 
                 userNameSpan.textContent = '';
                 userInfoDiv.classList.add('hidden');
                 googleSigninBtn.classList.remove('hidden');
-                planIntro.textContent = 'Please sign in to save and sync your progress with the shared plan.';
+                planIntro.textContent = 'Please sign in to save and sync your progress with the shared plan. Viewing read-only.';
                 renderPlan(viewFullBtn.classList.contains('bg-teal-600')); 
                 renderChart(); 
             }
