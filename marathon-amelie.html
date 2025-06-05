@@ -17,7 +17,7 @@
 
     <!-- Chosen Palette: Slate & Teal -->
     <!-- Application Structure Plan: A dashboard layout is used to provide an at-a-glance overview. The left column contains key stats (countdown, paces) and a visual chart of weekly effort, providing constant context. The main right column dynamically displays the training plan, defaulting to "This Week's" workouts for immediate relevance. This structure was chosen to transform the static plan into an active, daily tool. Users can easily see what they need to do today, track their progress visually, and switch to the full plan for future planning, making the information highly consumable and user-friendly. -->
-    <!-- Visualization & Content Choices: Weekly KM (Report Info) -> Goal: Visualize training load -> Viz: Bar Chart (Chart.js) -> Interaction: Hover for details -> Justification: Clearly shows workload progression and taper. | Training Schedule (Report Info) -> Goal: Present daily workouts clearly -> Viz: Interactive HTML Table -> Interaction: JS highlights current week, checkboxes mark completion/skipped/rescheduled, input fields for actuals, collapsible rows -> Justification: Makes the plan an active tracking and logging tool, improving scannability. | Race Date (Report Info) -> Goal: Build motivation -> Viz: Countdown Timer -> Interaction: None -> Justification: Creates a sense of urgency and excitement. -->
+    <!-- Visualization & Content Choices: Weekly KM (Report Info) -> Goal: Visualize training load -> Viz: Bar Chart (Chart.js) -> Interaction: Hover for details -> Justification: Clearly shows workload progression and taper. | Training Schedule (Report Info) -> Goal: Present daily workouts clearly -> Viz: Interactive HTML Table -> Interaction: JS highlights current week, checkboxes mark completion/skipped/rescheduled, input fields for actuals, collapsible rows, undo actions -> Justification: Makes the plan an active tracking and logging tool, improving scannability and flexibility. | Race Date (Report Info) -> Goal: Build motivation -> Viz: Countdown Timer -> Interaction: None -> Justification: Creates a sense of urgency and excitement. -->
     <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
     <style>
         body { font-family: 'Inter', sans-serif; }
@@ -120,7 +120,7 @@
         .run-details-collapsible.expanded {
             display: block;
         }
-        .toggle-details-btn, .sidebar-toggle-btn {
+        .toggle-details-btn, .sidebar-toggle-btn, .tip-toggle-btn {
             cursor: pointer;
             margin-right: 0.5rem;
             font-weight: bold;
@@ -173,8 +173,19 @@
         .skip-btn:hover { background-color: #ef4444; /* red-500 */ }
         .reschedule-btn { background-color: #60a5fa; /* blue-400 */ }
         .reschedule-btn:hover { background-color: #3b82f6; /* blue-500 */ }
-        .sidebar-section-content { display: none; }
-        .sidebar-section-content.expanded { display: block; }
+        .undo-btn { background-color: #9ca3af; /* gray-400 */ }
+        .undo-btn:hover { background-color: #6b7280; /* gray-500 */ }
+
+        .sidebar-section-content, .tip-content { display: none; }
+        .sidebar-section-content.expanded, .tip-content.expanded { display: block; }
+        .tip-item { margin-left: 1.5rem; }
+        .date-input-container {
+            margin-top: 0.5rem;
+            padding: 0.5rem;
+            background-color: #f1f5f9; /* slate-100 */
+            border-radius: 0.375rem;
+            display: none; /* Hidden by default */
+        }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800">
@@ -246,17 +257,57 @@
                  <section class="bg-white p-6 rounded-2xl shadow-sm">
                     <div class="flex justify-between items-center mb-3">
                         <h2 class="text-xl font-bold text-slate-900">Training & Race Tips 💡</h2>
-                        <span class="sidebar-toggle-btn" data-target="tips-content">+</span>
+                        <span class="sidebar-toggle-btn" data-target="tips-content-main">+</span>
                     </div>
-                    <div id="tips-content" class="sidebar-section-content">
-                        <ul class="space-y-3 text-sm text-slate-600 list-disc list-inside">
-                            <li><strong>Nutrition:</strong> Practice your race day fueling strategy on long runs. Don't try anything new on race day! Aim for 30-60g of carbs per hour.</li>
-                            <li><strong>Hydration:</strong> Drink water consistently throughout the day, especially before, during, and after runs. Consider electrolytes for long runs.</li>
-                            <li><strong>Rest & Recovery:</strong> Sleep is crucial for muscle repair and energy. Aim for 7-9 hours. Listen to your body; take extra rest if needed.</li>
-                            <li><strong>Pacing:</strong> Start your marathon slightly slower than your goal pace. Don't get carried away by the race day excitement!</li>
-                            <li><strong>Race Day Gear:</strong> Wear comfortable, tested shoes and clothing. Nothing new! Prepare for different weather conditions.</li>
-                            <li><strong>Mental Game:</strong> Visualize success. Break the race into smaller, manageable segments. Stay positive!</li>
-                        </ul>
+                    <div id="tips-content-main" class="sidebar-section-content text-sm text-slate-600">
+                        <div class="mb-3">
+                            <div class="flex items-center cursor-pointer tip-category-header" data-target="tips-nutrition">
+                                <span class="tip-toggle-btn">+</span><strong class="text-slate-700">Nutrition</strong>
+                            </div>
+                            <ul id="tips-nutrition" class="tip-content list-disc list-inside space-y-1 mt-1">
+                                <li class="tip-item">Practice race day fueling on long runs. No new foods/gels on race day!</li>
+                                <li class="tip-item">Aim for 30-60g of carbohydrates per hour during long efforts.</li>
+                                <li class="tip-item">Experiment with different types of energy gels, chews, or real food to see what your stomach tolerates best.</li>
+                                <li class="tip-item">Have a balanced pre-race meal 2-3 hours before the start, focusing on easily digestible carbs.</li>
+                                <li class="tip-item">Start refueling with carbs and protein within 30-60 minutes after finishing long runs or hard workouts.</li>
+                            </ul>
+                        </div>
+                        <div class="mb-3">
+                             <div class="flex items-center cursor-pointer tip-category-header" data-target="tips-hydration">
+                                <span class="tip-toggle-btn">+</span><strong class="text-slate-700">Hydration</strong>
+                            </div>
+                            <ul id="tips-hydration" class="tip-content list-disc list-inside space-y-1 mt-1">
+                                <li class="tip-item">Drink water consistently throughout the day, every day, not just on run days.</li>
+                                <li class="tip-item">Consider electrolytes (sodium, potassium) for runs longer than 60-90 minutes, especially in warm weather.</li>
+                                <li class="tip-item">Practice drinking while running to get used to aid station cups or your hydration system.</li>
+                                <li class="tip-item">Monitor urine color: pale yellow is a good sign of hydration. Dark yellow means drink more.</li>
+                                <li class="tip-item">Don't overhydrate either; listen to your thirst.</li>
+                            </ul>
+                        </div>
+                         <div class="mb-3">
+                             <div class="flex items-center cursor-pointer tip-category-header" data-target="tips-recovery">
+                                <span class="tip-toggle-btn">+</span><strong class="text-slate-700">Rest & Recovery</strong>
+                            </div>
+                            <ul id="tips-recovery" class="tip-content list-disc list-inside space-y-1 mt-1">
+                                <li class="tip-item">Sleep is crucial for muscle repair and energy. Aim for 7-9 hours consistently.</li>
+                                <li class="tip-item">Listen to your body; take extra rest days or easier days if feeling overly fatigued or experiencing pain.</li>
+                                <li class="tip-item">Incorporate active recovery like light walking, stretching, or foam rolling.</li>
+                                <li class="tip-item">Don't underestimate the power of a complete rest day. It's when your body adapts and gets stronger.</li>
+                                <li class="tip-item">Manage stress, as high stress can impede recovery.</li>
+                            </ul>
+                        </div>
+                         <div class="mb-3">
+                             <div class="flex items-center cursor-pointer tip-category-header" data-target="tips-race-day">
+                                <span class="tip-toggle-btn">+</span><strong class="text-slate-700">Race Day Specifics</strong>
+                            </div>
+                            <ul id="tips-race-day" class="tip-content list-disc list-inside space-y-1 mt-1">
+                                <li class="tip-item">Pacing: Start your marathon slightly slower than your goal pace. Don't get carried away by the race day excitement!</li>
+                                <li class="tip-item">Gear: Wear comfortable, tested shoes and clothing. Nothing new! Prepare for different weather conditions.</li>
+                                <li class="tip-item">Mental Game: Visualize success. Break the race into smaller, manageable segments. Stay positive!</li>
+                                <li class="tip-item">Arrive early to the start line to avoid stress, use restrooms, and do a light warm-up.</li>
+                                <li class="tip-item">Know the course, especially aid station locations and any significant hills.</li>
+                            </ul>
+                        </div>
                     </div>
                 </section>
 
@@ -319,9 +370,13 @@
         let mileageChartInstance = null;
         let expandedState = JSON.parse(localStorage.getItem('expandedState_Amelie_v1')) || {}; 
         let sidebarExpandedState = JSON.parse(localStorage.getItem('sidebarExpandedState_Amelie_v1')) || {
-            'weekly-volume-content': true, // Default weekly volume to expanded
+            'weekly-volume-content': true, 
             'pace-guide-content': false,
-            'tips-content': false
+            'tips-content-main': false, // For the main tips section
+            'tips-nutrition': false,     // For tips subsections
+            'tips-hydration': false,
+            'tips-recovery': false,
+            'tips-race-day': false
         };
         let runLogData = {}; 
         let currentUser = null;
@@ -535,7 +590,7 @@
                     const plannedWorkout = plannedWorkouts[dayIndex];
                     if (plannedWorkout) {
                         const runId = `w${weekData.week}d${dayIndex}`;
-                        const log = runLogData[runId] || { status: 'pending', actualTime: '', actualDistance: '', comments: '', calculatedPace: '--:-- /km', rescheduledTo: null };
+                        const log = runLogData[runId] || { status: 'pending', actualTime: '', actualDistance: '', comments: '', calculatedPace: '--:-- /km', rescheduledTo: null, previousStatus: 'pending' };
                         const isCurrentActualWeek = weekData.week === currentDisplayWeek;
                         const exactDateStr = getFormattedDate(weekStartDate, dayIndex);
                         const isRestDay = plannedWorkout.toLowerCase().startsWith("rest");
@@ -584,28 +639,38 @@
                                 rescheduledText = `<span class="text-xs text-blue-600 ml-2">(Rescheduled to ${new Date(log.rescheduledTo + 'T00:00:00').toLocaleDateString('en-US', {month: 'short', day: 'numeric'}) })</span>`;
                             }
 
-
                             if (currentUser) { 
                                 rowHTML += `<td class="p-3">
-                                    <div class="flex items-start gap-1">
+                                    <div class="flex items-center gap-1 flex-wrap">
                                         <span class="toggle-details-btn" data-runid="${runId}">${isExpanded ? '−' : '+'}</span>
-                                        <input type="checkbox" id="${runId}-completed" data-runid="${runId}" class="run-checkbox-completed h-5 w-5 mt-1 rounded border-gray-400 text-teal-600 focus:ring-teal-500 cursor-pointer" ${log.status === 'completed' ? 'checked' : ''} ${log.status === 'skipped' || log.status === 'rescheduled' ? 'disabled' : ''}>
+                                        <input type="checkbox" id="${runId}-completed" data-runid="${runId}" class="run-checkbox-completed h-5 w-5 mt-1 rounded border-gray-400 text-teal-600 focus:ring-teal-500 cursor-pointer" 
+                                            ${log.status === 'completed' ? 'checked' : ''} 
+                                            ${log.status === 'skipped' || log.status === 'rescheduled' ? 'disabled' : ''}>
                                         <label for="${runId}-completed" class="run-log-label flex-1 font-medium text-slate-800 cursor-pointer">${plannedWorkout}</label>
                                         ${milestoneBadge}
-                                        ${log.status !== 'skipped' && log.status !== 'rescheduled' ? `<button class="skip-btn action-btn" data-runid="${runId}">Skip</button>` : ''}
-                                        ${log.status !== 'skipped' && log.status !== 'rescheduled' ? `<button class="reschedule-btn action-btn" data-runid="${runId}">Reschedule</button>` : ''}
-                                        ${log.status === 'skipped' ? '<span class="text-xs text-slate-500 ml-2">(Skipped)</span>' : ''}
-                                        ${rescheduledText}
+                                        <div class="ml-auto flex items-center space-x-1 mt-1 sm:mt-0">
+                                            ${log.status === 'skipped' || log.status === 'rescheduled' ? `<button class="undo-btn action-btn" data-runid="${runId}" data-previous-status="${log.previousStatus || 'pending'}">Undo</button>` : ''}
+                                            ${log.status !== 'skipped' && log.status !== 'rescheduled' ? `<button class="skip-btn action-btn" data-runid="${runId}">Skip</button>` : ''}
+                                            ${log.status !== 'skipped' ? `<button class="reschedule-btn action-btn" data-runid="${runId}">Reschedule</button>` : ''}
+                                        </div>
+                                        ${log.status === 'skipped' ? '<span class="text-xs text-slate-500 w-full pl-7">(Skipped)</span>' : ''}
+                                        ${rescheduledText ? `<span class="text-xs text-blue-600 w-full pl-7">${rescheduledText.replace(/<\/?span[^>]*>/g,'')}</span>` : ''}
                                     </div>
                                     <div id="${runId}-details" class="run-details-collapsible ${isExpanded ? 'expanded' : ''}">
+                                        <div id="${runId}-reschedule-input-container" class="date-input-container">
+                                             <label for="${runId}-reschedule-date" class="block text-xs font-medium text-slate-500 mb-1">New Date:</label>
+                                             <input type="date" id="${runId}-reschedule-date" class="input-sm mr-2">
+                                             <button class="confirm-reschedule-btn action-btn bg-green-500 hover:bg-green-600" data-runid="${runId}">Confirm</button>
+                                             <button class="cancel-reschedule-btn action-btn bg-gray-400 hover:bg-gray-500" data-runid="${runId}">Cancel</button>
+                                        </div>
                                         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 mt-2">
                                             <div>
                                                 <label for="${runId}-time" class="block text-xs font-medium text-slate-500 mb-1">Time Ran</label>
-                                                <input type="text" id="${runId}-time" data-runid="${runId}" value="${log.actualTime || ''}" placeholder="HH:MM:SS or MM:SS" class="actual-time-input input-sm w-full" ${log.status === 'skipped' || log.status === 'rescheduled' ? 'disabled' : ''}>
+                                                <input type="text" id="${runId}-time" data-runid="${runId}" value="${log.actualTime || ''}" placeholder="HH:MM:SS or MM:SS" class="actual-time-input input-sm w-full" ${log.status === 'skipped' ? 'disabled' : ''}>
                                             </div>
                                             <div>
                                                 <label for="${runId}-dist" class="block text-xs font-medium text-slate-500 mb-1">Distance (km)</label>
-                                                <input type="number" id="${runId}-dist" data-runid="${runId}" value="${log.actualDistance || ''}" step="0.01" placeholder="e.g., 5.25" class="actual-distance-input input-sm w-full" ${log.status === 'skipped' || log.status === 'rescheduled' ? 'disabled' : ''}>
+                                                <input type="number" id="${runId}-dist" data-runid="${runId}" value="${log.actualDistance || ''}" step="0.01" placeholder="e.g., 5.25" class="actual-distance-input input-sm w-full" ${log.status === 'skipped' ? 'disabled' : ''}>
                                             </div>
                                             <div>
                                                 <label class="block text-xs font-medium text-slate-500 mb-1">Actual Pace</label>
@@ -614,7 +679,7 @@
                                         </div>
                                         <div class="mt-2">
                                             <label for="${runId}-comments" class="block text-xs font-medium text-slate-500 mb-1">Comments</label>
-                                            <textarea id="${runId}-comments" data-runid="${runId}" placeholder="How was the run? Any notes..." class="actual-comments-input input-sm w-full text-xs" rows="2" ${log.status === 'skipped' || log.status === 'rescheduled' ? 'disabled' : ''}>${log.comments || ''}</textarea>
+                                            <textarea id="${runId}-comments" data-runid="${runId}" placeholder="How was the run? Any notes..." class="actual-comments-input input-sm w-full text-xs" rows="2" ${log.status === 'skipped' ? 'disabled' : ''}>${log.comments || ''}</textarea>
                                         </div>
                                     </div>
                                 </td>`;
@@ -668,41 +733,53 @@
         }
         
         async function updateRunDataAndUI(runId, field, value) {
-            if (!runLogData[runId]) {
-                runLogData[runId] = { status: 'pending', actualTime: '', actualDistance: '', comments: '', calculatedPace: '--:-- /km', rescheduledTo: null };
+            const currentLog = runLogData[runId] || { status: 'pending', actualTime: '', actualDistance: '', comments: '', calculatedPace: '--:-- /km', rescheduledTo: null, previousStatus: 'pending' };
+            
+            // Store previous status before changing it for skip/reschedule/undo
+            if ((field === 'status' && (value === 'skipped' || value === 'rescheduled')) || (field === 'undo')) {
+                if (currentLog.status !== 'skipped' && currentLog.status !== 'rescheduled') { // Only store if not already skipped/rescheduled
+                    currentLog.previousStatus = currentLog.status;
+                }
             }
+            
+            if (!runLogData[runId]) {
+                runLogData[runId] = { ...currentLog }; // Initialize if doesn't exist
+            }
+
             if (field === 'actualTime') {
                 value = typeof value === 'string' ? value.trim() : value;
             }
             
-            if (field === 'status') { // Handle status changes (skipped, rescheduled)
-                runLogData[runId].status = value;
-                if (value === 'skipped' || value === 'rescheduled') {
-                    runLogData[runId].completed = false; // Ensure completed is false
-                    // Reset logged data if skipped or rescheduled
-                    if(value === 'skipped'){
-                        runLogData[runId].actualTime = '';
-                        runLogData[runId].actualDistance = '';
-                        runLogData[runId].comments = '';
-                        runLogData[runId].calculatedPace = '--:-- /km';
-                        runLogData[runId].rescheduledTo = null;
-                    }
+            if (field === 'undo') {
+                runLogData[runId].status = currentLog.previousStatus || 'pending';
+                runLogData[runId].rescheduledTo = null; // Clear rescheduled date on undo
+                // Keep logged data if previousStatus was 'completed', otherwise clear for 'pending'
+                if (runLogData[runId].status !== 'completed') {
+                    runLogData[runId].actualTime = '';
+                    runLogData[runId].actualDistance = '';
+                    runLogData[runId].comments = ''; // Keep comments if desired, or clear
+                    runLogData[runId].calculatedPace = '--:-- /km';
                 }
-                 if (value === 'rescheduled' && runLogData[runId].rescheduledTo === null) {
-                     // If status becomes 'rescheduled' but no date is set yet,
-                     // it implies the user clicked "Reschedule" but hasn't picked a date.
-                     // The actual date setting will be handled by the reschedule prompt.
-                 }
-
+            } else if (field === 'status') { 
+                runLogData[runId].status = value;
+                if (value === 'skipped') {
+                    runLogData[runId].completed = false; 
+                    runLogData[runId].actualTime = ''; runLogData[runId].actualDistance = ''; runLogData[runId].comments = ''; runLogData[runId].calculatedPace = '--:-- /km';
+                    runLogData[runId].rescheduledTo = null;
+                } else if (value === 'rescheduled') {
+                     runLogData[runId].completed = false;
+                }
             } else if (field === 'completed') {
                  runLogData[runId].status = value ? 'completed' : 'pending';
-                 runLogData[runId].completed = value; // Legacy, but useful for quick checks
-                 if (value) runLogData[runId].rescheduledTo = null; // Clear rescheduled if completed
+                 runLogData[runId].completed = value; 
+                 if (value) runLogData[runId].rescheduledTo = null; 
             } else if (field === 'rescheduledTo') {
                  runLogData[runId].rescheduledTo = value;
-                 if (value) { // If a date is set, mark as rescheduled
+                 if (value) { 
                      runLogData[runId].status = 'rescheduled';
                      runLogData[runId].completed = false;
+                 } else { // If date cleared, revert to previous or pending
+                    runLogData[runId].status = currentLog.previousStatus || 'pending';
                  }
             }
             else {
@@ -717,6 +794,7 @@
             const commentsInputEl = document.getElementById(`${runId}-comments`);
             const skipBtnEl = planContainer.querySelector(`.skip-btn[data-runid="${runId}"]`);
             const rescheduleBtnEl = planContainer.querySelector(`.reschedule-btn[data-runid="${runId}"]`);
+            const undoBtnEl = planContainer.querySelector(`.undo-btn[data-runid="${runId}"]`); // Will be created dynamically
 
 
             if (field === 'actualTime' || field === 'actualDistance') {
@@ -738,7 +816,7 @@
                 const timeIsEnteredAndValid = timeVal && parseTimeToSeconds(timeVal) !== -1;
                 const distIsEnteredAndValid = distVal && isValidDistance(distVal) && parseFloat(distVal) > 0;
 
-                if (timeIsEnteredAndValid && distIsEnteredAndValid && runLogData[runId].status !== 'completed' && runLogData[runId].status !== 'skipped' && runLogData[runId].status !== 'rescheduled') {
+                if (timeIsEnteredAndValid && distIsEnteredAndValid && runLogData[runId].status === 'pending') {
                     runLogData[runId].status = 'completed'; 
                     runLogData[runId].completed = true;
                     if (completedCheckbox) completedCheckbox.checked = true; 
@@ -755,43 +833,64 @@
                 const weekNumberFromRunId = parseInt(runId.match(/w(\d+)/)[1]);
                 const isCurrentActualWeek = weekNumberFromRunId === currentWeekNumberGlobal;
 
-                if (!isRestDay) {
-                    let inputsDisabled = false;
-                    let checkboxDisabled = false;
-                    let showSkip = true;
-                    let showReschedule = true;
+                let inputsDisabled = false;
+                let checkboxDisabled = false;
+                let showSkip = true;
+                let showReschedule = true;
+                let showUndo = false;
 
+                if (!isRestDay) {
                     if (runLogData[runId].status === 'completed') {
                         rowElement.classList.add('bg-teal-50', 'completed-run');
-                        if(completedCheckbox) completedCheckbox.checked = true;
+                        if(completedCheckbox) { completedCheckbox.checked = true; checkboxDisabled = false;}
                         showSkip = false;
-                        showReschedule = false;
+                        showReschedule = false; // Can't reschedule a completed run directly, should undo first
+                        showUndo = true;
                     } else if (runLogData[runId].status === 'skipped') {
                         rowElement.classList.add('bg-slate-200-opacity', 'skipped-run');
                         if(completedCheckbox) {completedCheckbox.checked = false; checkboxDisabled = true;}
                         inputsDisabled = true;
                         showSkip = false;
-                        showReschedule = true; // Allow rescheduling a skipped run
+                        showReschedule = false; // Can't reschedule a skipped run directly
+                        showUndo = true;
                     } else if (runLogData[runId].status === 'rescheduled') {
                         rowElement.classList.add('bg-blue-100-opacity', 'rescheduled-run');
                          if(completedCheckbox) {completedCheckbox.checked = false; checkboxDisabled = true;}
-                        inputsDisabled = true;
+                        // Inputs remain enabled for rescheduled runs
                         showSkip = false; 
                         showReschedule = true; // Allow re-rescheduling
+                        showUndo = true;
                     }
                     else { // pending
                         rowElement.classList.add('bg-custom-yellow');
+                         if(completedCheckbox) checkboxDisabled = false;
                     }
 
                     if(completedCheckbox) completedCheckbox.disabled = checkboxDisabled;
                     if(timeInputEl) timeInputEl.disabled = inputsDisabled;
                     if(distInputEl) distInputEl.disabled = inputsDisabled;
                     if(commentsInputEl) commentsInputEl.disabled = inputsDisabled;
-                    if(skipBtnEl) skipBtnEl.style.display = showSkip ? 'inline-block' : 'none';
-                    if(rescheduleBtnEl) rescheduleBtnEl.style.display = showReschedule ? 'inline-block' : 'none';
+                    
+                    // Update buttons
+                    const actionContainer = rowElement.querySelector('.flex.items-center.space-x-1'); // Assuming buttons are in this container
+                    if(actionContainer){
+                        const existingUndoBtn = actionContainer.querySelector('.undo-btn');
+                        if(existingUndoBtn) existingUndoBtn.remove();
+                        if(skipBtnEl) skipBtnEl.style.display = showSkip ? 'inline-block' : 'none';
+                        if(rescheduleBtnEl) rescheduleBtnEl.style.display = showReschedule ? 'inline-block' : 'none';
+                        if(showUndo){
+                            const newUndoBtn = document.createElement('button');
+                            newUndoBtn.className = 'undo-btn action-btn';
+                            newUndoBtn.dataset.runid = runId;
+                            newUndoBtn.textContent = 'Undo';
+                            if(skipBtnEl) skipBtnEl.insertAdjacentElement('afterend', newUndoBtn); // Place it nicely
+                            else if(rescheduleBtnEl) rescheduleBtnEl.insertAdjacentElement('afterend', newUndoBtn);
+                            else actionContainer.appendChild(newUndoBtn);
+                        }
+                    }
 
 
-                } else if (isCurrentActualWeek) {
+                } else if (isCurrentActualWeek) { // Rest day in current week
                      rowElement.classList.add('bg-teal-50');
                 }
             }
@@ -851,27 +950,31 @@
                         saveExpandedState();
                     }
                 } else if (e.target.classList.contains('skip-btn')) {
-                     if (!currentUser) {
-                        alert("Please sign in to modify run status.");
-                        return;
-                    }
+                     if (!currentUser) { alert("Please sign in to modify run status."); return;}
                     const runId = e.target.dataset.runid;
                     updateRunDataAndUI(runId, 'status', 'skipped');
                 } else if (e.target.classList.contains('reschedule-btn')) {
-                    if (!currentUser) {
-                        alert("Please sign in to reschedule runs.");
-                        return;
-                    }
+                    if (!currentUser) { alert("Please sign in to reschedule runs."); return;}
                     const runId = e.target.dataset.runid;
-                    const newDateISO = prompt("Enter new date (YYYY-MM-DD) to reschedule this run:", getISODateString(new Date()));
-                    if (newDateISO) { // Check if user provided a date
-                        // Basic validation for YYYY-MM-DD format
-                        if (/^\d{4}-\d{2}-\d{2}$/.test(newDateISO)) {
-                             updateRunDataAndUI(runId, 'rescheduledTo', newDateISO);
-                        } else {
-                            alert("Invalid date format. Please use YYYY-MM-DD.");
-                        }
+                    const container = document.getElementById(`${runId}-reschedule-input-container`);
+                    if (container) container.style.display = 'flex'; // Show date input
+                } else if (e.target.classList.contains('confirm-reschedule-btn')) {
+                    if (!currentUser) return;
+                    const runId = e.target.dataset.runid;
+                    const dateInput = document.getElementById(`${runId}-reschedule-date`);
+                    if (dateInput.value) {
+                        updateRunDataAndUI(runId, 'rescheduledTo', dateInput.value);
+                        document.getElementById(`${runId}-reschedule-input-container`).style.display = 'none';
+                    } else {
+                        alert("Please select a date.");
                     }
+                } else if (e.target.classList.contains('cancel-reschedule-btn')) {
+                    const runId = e.target.dataset.runid;
+                    document.getElementById(`${runId}-reschedule-input-container`).style.display = 'none';
+                } else if (e.target.classList.contains('undo-btn')) {
+                    if (!currentUser) { alert("Please sign in to undo actions."); return; }
+                    const runId = e.target.dataset.runid;
+                    updateRunDataAndUI(runId, 'undo', true); // 'true' is arbitrary, action is 'undo'
                 }
             });
         }
@@ -928,7 +1031,6 @@
                 const targetId = button.dataset.target;
                 const contentDiv = document.getElementById(targetId);
                 if (contentDiv) {
-                    // Apply initial state from localStorage
                     if (sidebarExpandedState[targetId]) {
                         contentDiv.classList.add('expanded');
                         button.textContent = '−';
@@ -936,10 +1038,29 @@
                         contentDiv.classList.remove('expanded');
                         button.textContent = '+';
                     }
-
                     button.addEventListener('click', () => {
                         const isExpanded = contentDiv.classList.toggle('expanded');
                         button.textContent = isExpanded ? '−' : '+';
+                        sidebarExpandedState[targetId] = isExpanded;
+                        saveSidebarExpandedState();
+                    });
+                }
+            });
+            document.querySelectorAll('.tip-category-header').forEach(header => {
+                const targetId = header.dataset.target;
+                const contentDiv = document.getElementById(targetId);
+                const toggleBtn = header.querySelector('.tip-toggle-btn');
+                if(contentDiv && toggleBtn){
+                    if (sidebarExpandedState[targetId]) {
+                        contentDiv.classList.add('expanded');
+                        toggleBtn.textContent = '−';
+                    } else {
+                        contentDiv.classList.remove('expanded');
+                        toggleBtn.textContent = '+';
+                    }
+                    header.addEventListener('click', () => {
+                        const isExpanded = contentDiv.classList.toggle('expanded');
+                        toggleBtn.textContent = isExpanded ? '−' : '+';
                         sidebarExpandedState[targetId] = isExpanded;
                         saveSidebarExpandedState();
                     });
@@ -1123,7 +1244,7 @@
             
         attachInputListeners(); 
         startCountdown();
-        setupSidebarToggles(); // Initialize sidebar toggles
+        setupSidebarToggles(); 
     </script>
 </body>
 </html>
