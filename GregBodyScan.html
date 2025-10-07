@@ -1,0 +1,66 @@
+from IPython.display import HTML
+
+html_content = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Biometric Body Composition Report</title>
+    <style>
+        body { font-family: 'Arial', sans-serif; margin: 0; padding: 20px; background-color: #f4f4f9; }
+        .container { max-width: 800px; margin: 0 auto; background-color: #fff; padding: 30px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        h1 { color: #004d40; border-bottom: 2px solid #e0e0e0; padding-bottom: 10px; margin-top: 0; }
+        h2 { color: #26a69a; margin-top: 25px; border-bottom: 1px dashed #cfd8dc; padding-bottom: 5px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background-color: #e0f2f1; color: #004d40; font-weight: bold; }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+        .note { font-size: 0.9em; color: #555; margin-top: 20px; border-left: 3px solid #26a69a; padding-left: 10px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Biometric Body Composition Report</h1>
+        <p><strong>Scan Date:</strong> October 8, 2025</p>
+        <p><strong>Client Profile:</strong> 31 Years Old (Male)</p>
+
+        <h2>Part 1: Global Health & Fitness Profile</h2>
+        <table>
+            <thead>
+                <tr><th>Metric</th><th>Value</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>Weight</td><td>79.0 kg</td></tr><tr><td>Height</td><td>189 cm</td></tr><tr><td>BMI (Body Mass Index)</td><td>22.1 </td></tr><tr><td>Basal Metabolic Rate (BMR)</td><td>2043 kcal</td></tr><tr><td>Metabolic Age</td><td>16 Years</td></tr><tr><td>Visceral Fat Rating</td><td>2 </td></tr>
+            </tbody>
+        </table>
+        
+        <h2 style="margin-top: 40px;">Part 2: Total Body Composition</h2>
+        <table>
+            <thead>
+                <tr><th>Composition Metric</th><th>Value & Unit</th><th>Rating</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>Total Body Fat</td><td>10.6 %</td><td>Excellent</td></tr><tr><td>Total Muscle Mass</td><td>67.1 kg</td><td>Strong</td></tr><tr><td>Fat Free Mass (FFM)</td><td>70.6 kg</td><td></td></tr><tr><td>Bone Mass</td><td>3.5 kg</td><td></td></tr>
+            </tbody>
+        </table>
+        
+        <h2 style="margin-top: 40px;">Part 3: Detailed Segmental Breakdown</h2>
+        <table>
+            <thead>
+                <tr><th>Body Segment</th><th>Muscle Mass (kg)</th><th>Fat Mass (kg)</th><th>Fat Percentage (%)</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>Trunk (Core)</td><td>35.3</td><td>5.0</td><td>11.9%</td></tr><tr><td>Right Leg</td><td>11.9</td><td>1.1</td><td>7.9%</td></tr><tr><td>Left Leg</td><td>11.8</td><td>1.2</td><td>8.8%</td></tr><tr><td>Right Arm</td><td>4.0</td><td>0.6</td><td>11.8%</td></tr><tr><td>Left Arm</td><td>4.1</td><td>0.5</td><td>11.3%</td></tr>
+            </tbody>
+        </table>
+
+        <div class="note">
+            <strong>Symmetry Note:</strong> Muscle and fat distribution is highly symmetrical between left and right limbs, which is excellent for performance.
+        </div>
+    </div>
+</body>
+</html>
+"""
+
+HTML(html_content)
