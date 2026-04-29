@@ -11,11 +11,11 @@
         body { font-family: 'Inter', sans-serif; letter-spacing: -0.01em; }
         .bg-teal-50 { background-color: #f0fdfa; } 
         .today-run-highlight { border-left: 4px solid #14b8a6; background-color: #f0fdfa !important; }
-        .week-container.collapsed .week-content { display: none; }
         .week-header { cursor: pointer; transition: background 0.2s; }
-        .rest-day-row { opacity: 0.3; filter: grayscale(1); background-color: #f8fafc; }
+        .rest-day-row { opacity: 0.25; filter: grayscale(1); background-color: #f8fafc; }
         .comment-item { animation: fadeIn 0.3s ease; border-left: 2px solid #2dd4bf; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        /* Custom Toggle Switch */
         .switch { position: relative; display: inline-block; width: 34px; height: 20px; }
         .switch input { opacity: 0; width: 0; height: 0; }
         .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #e2e8f0; transition: .4s; border-radius: 20px; }
@@ -37,9 +37,9 @@
         <div id="auth-container" class="flex items-center space-x-4">
             <div id="user-info" class="hidden flex items-center space-x-3">
                 <span id="user-name" class="text-sm font-bold text-slate-700"></span>
-                <button id="signout-btn" class="text-[10px] bg-slate-100 px-2 py-1 rounded-md text-slate-400 font-bold uppercase hover:bg-red-50 hover:text-red-500 transition-all">Sign Out</button>
+                <button id="signout-btn" onclick="handleSignOut()" class="text-[10px] bg-slate-100 px-2 py-1 rounded-md text-slate-400 font-bold uppercase hover:bg-red-50 hover:text-red-500 transition-all">Sign Out</button>
             </div>
-            <button id="google-signin-btn" class="bg-blue-600 text-white px-5 py-2 rounded-xl text-sm font-bold shadow-lg shadow-blue-100">Sign in</button>
+            <button id="google-signin-btn" onclick="handleSignIn()" class="bg-blue-600 text-white px-5 py-2 rounded-xl text-sm font-bold shadow-lg shadow-blue-100">Sign in</button>
         </div>
     </nav>
 
@@ -48,12 +48,12 @@
             <aside class="space-y-6">
                 <section class="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-100 text-center">
                     <div id="countdown" class="text-6xl font-black text-teal-600 tracking-tighter">--</div>
-                    <p class="text-[10px] text-slate-400 font-black uppercase mt-2 tracking-widest">Days to Melbourne</p>
+                    <p class="text-[10px] text-slate-400 font-black uppercase mt-2 tracking-widest text-center">Days to Melbourne</p>
                 </section>
                 <section class="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
                     <h2 class="text-xs font-black text-slate-400 uppercase mb-4 tracking-widest text-center">Activity Inbox</h2>
-                    <div id="strava-inbox" class="space-y-3 text-center">
-                        <p class="text-xs text-slate-300 italic">No runs detected.</p>
+                    <div id="strava-inbox" class="space-y-3">
+                        <p class="text-xs text-slate-300 italic text-center">No runs to match.</p>
                     </div>
                 </section>
             </aside>
@@ -63,7 +63,7 @@
                     <div class="mb-8 flex justify-between items-center">
                         <div>
                             <h2 class="text-4xl font-black text-slate-900 tracking-tighter" id="display-name">Mimi's Plan</h2>
-                            <p class="text-teal-600 text-[10px] font-black mt-1 uppercase tracking-widest">October 11, 2026</p>
+                            <p class="text-teal-600 text-[10px] font-black mt-1 uppercase tracking-widest">Training for October 11</p>
                         </div>
                         <div class="flex items-center space-x-3 bg-slate-50 px-4 py-2 rounded-2xl border border-slate-100">
                             <span class="text-[10px] font-black text-slate-400 uppercase">Hide Rest</span>
@@ -73,15 +73,17 @@
                             </label>
                         </div>
                     </div>
-                    <div id="plan-container" class="space-y-6"></div>
+                    <div id="plan-container" class="space-y-6 text-center text-slate-300 italic py-10">Initializing system...</div>
                 </section>
             </div>
         </div>
     </div>
 
     <script type="module">
+        console.log("System: Script Loading...");
+
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.7/firebase-app.js";
-        import { getFirestore, doc, onSnapshot, setDoc, updateDoc, collection, query, where, arrayUnion } from "https://www.gstatic.com/firebasejs/9.6.7/firebase-firestore.js";
+        import { getFirestore, doc, onSnapshot, setDoc, collection, query, where, arrayUnion } from "https://www.gstatic.com/firebasejs/9.6.7/firebase-firestore.js";
         import { getAuth, GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.6.7/firebase-auth.js";
 
         const firebaseConfig = {
@@ -110,16 +112,40 @@
         const currentWeekNum = Math.max(1, Math.min(12, Math.floor((new Date() - planStartDate) / (7 * 864e5)) + 1));
         expandedWeeks.add(currentWeekNum);
 
-        // Core Functions
-        const getWorkoutDate = (wIdx, dIdx) => {
-            const d = new Date(planStartDate);
-            d.setDate(d.getDate() + (wIdx * 7) + dIdx);
-            return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
+        // --- GLOBAL FUNCTIONS (Attached to window immediately) ---
+        
+        window.switchProfile = (name) => {
+            console.log("System: Switching to", name);
+            activeUser = name;
+            document.getElementById('display-name').innerText = name.charAt(0).toUpperCase() + name.slice(1) + "'s Plan";
+            document.getElementById('btn-mimi').className = name === 'mimi' ? 'px-6 py-1.5 rounded-lg text-sm font-semibold bg-white shadow-sm text-teal-600' : 'px-6 py-1.5 rounded-lg text-sm font-semibold text-slate-500';
+            document.getElementById('btn-gregou').className = name === 'gregou' ? 'px-6 py-1.5 rounded-lg text-sm font-semibold bg-white shadow-sm text-teal-600' : 'px-6 py-1.5 rounded-lg text-sm font-semibold text-slate-500';
+            initSync();
         };
 
-        // This needs to be local for initSync AND global for the toggle
-        const renderPlan = () => {
+        window.handleSignIn = () => signInWithRedirect(auth, provider);
+        window.handleSignOut = () => signOut(auth);
+
+        window.toggleWeek = (num) => {
+            if (expandedWeeks.has(num)) expandedWeeks.delete(num);
+            else expandedWeeks.add(num);
+            window.renderPlan();
+        };
+
+        window.postComment = async (runId) => {
+            const input = document.getElementById(`input-${runId}`);
+            if (!input?.value || !auth.currentUser) return;
+            try {
+                await setDoc(doc(db, `users/${activeUser}`, "runLogs", runId), {
+                    comments: arrayUnion({ user: auth.currentUser.displayName.split(' ')[0], text: input.value, ts: Date.now() })
+                }, { merge: true });
+                input.value = '';
+            } catch (e) { console.error("Comment Error:", e); }
+        };
+
+        window.renderPlan = () => {
             const container = document.getElementById('plan-container');
+            if (!container) return;
             const hideRest = document.getElementById('hide-rest-toggle')?.checked || false;
             container.innerHTML = '';
 
@@ -157,7 +183,7 @@
                     tr.innerHTML = `
                         <td class="p-6 w-24 align-top">
                             <p class="text-[10px] font-black text-slate-300 uppercase leading-none">${day}</p>
-                            <p class="text-xs font-bold text-slate-600">${getWorkoutDate(week.week-1, dIdx)}</p>
+                            <p class="text-xs font-bold text-slate-600">${new Date(planStartDate.getTime() + ((week.week - 1) * 7 + dIdx) * 864e5).toLocaleDateString('en-AU', {day:'numeric', month:'short'})}</p>
                         </td>
                         <td class="p-6 align-top">
                             <div class="flex flex-col">
@@ -168,4 +194,77 @@
                                         <div class="space-y-1.5">${(log.comments || []).map(c => `<div class="comment-item text-[11px] bg-slate-50 p-2.5 rounded-xl border border-slate-100"><span class="font-black text-teal-600 uppercase text-[9px] mr-1">${c.user}:</span><span class="text-slate-600 font-medium">${c.text}</span></div>`).join('')}</div>
                                         <div class="flex mt-3 shadow-sm rounded-xl overflow-hidden border border-slate-100">
                                             <input type="text" id="input-${runId}" placeholder="Leave a note..." class="bg-white border-none text-[11px] px-4 py-2 w-full focus:ring-0">
-                                            <button onclick="window.postComment('${runId}')" class="bg-slate-900 text-white px-4 text-[10px] font-black uppercase tracking-widest">
+                                            <button onclick="window.postComment('${runId}')" class="bg-slate-900 text-white px-4 text-[10px] font-black uppercase tracking-widest">Post</button>
+                                        </div>
+                                    </div>` : ''}
+                            </div>
+                        </td>
+                        <td class="p-6 text-right align-top">
+                            ${!isRest ? `<button class="bg-white border border-slate-200 px-4 py-1.5 rounded-xl text-[10px] font-black text-slate-400 uppercase tracking-tighter hover:text-teal-600 transition-all">Match</button>` : ''}
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+                if (tbody.children.length > 0) container.appendChild(weekDiv);
+            });
+        };
+
+        // --- INTERNAL SYNC ---
+        let unsubPlan, unsubLogs, unsubInbox;
+        
+        function initSync() {
+            console.log("System: Initializing Sync for", activeUser);
+            if (unsubPlan) unsubPlan(); if (unsubLogs) unsubLogs(); if (unsubInbox) unsubInbox();
+
+            unsubPlan = onSnapshot(collection(db, `users/${activeUser}`, "planData"), (snap) => {
+                trainingPlanData = [];
+                snap.forEach(d => trainingPlanData.push({ week: parseInt(d.id.replace('week','')), ...d.data() }));
+                trainingPlanData.sort((a, b) => a.week - b.week);
+                window.renderPlan();
+            });
+
+            unsubLogs = onSnapshot(collection(db, `users/${activeUser}`, "runLogs"), (snap) => {
+                runLogData = {};
+                snap.forEach(d => runLogData[d.id] = d.data());
+                window.renderPlan();
+            });
+
+            unsubInbox = onSnapshot(query(collection(db, `users/${activeUser}`, "stravaInbox"), where("status", "==", "pending")), (snap) => {
+                const container = document.getElementById('strava-inbox');
+                container.innerHTML = snap.empty ? '<p class="text-[10px] text-slate-300 italic text-center">No runs in inbox.</p>' : '';
+                snap.forEach(runDoc => {
+                    const run = runDoc.data();
+                    const div = document.createElement('div');
+                    div.className = 'bg-slate-50 p-4 rounded-2xl border border-slate-100';
+                    div.innerHTML = `<p class="text-sm font-black text-slate-800">${run.distance}km @ ${run.date}</p><button class="w-full mt-2 bg-white border border-slate-200 text-[9px] font-black py-2 rounded-xl uppercase hover:bg-teal-600 hover:text-white transition-all">Match</button>`;
+                    container.appendChild(div);
+                });
+            });
+        }
+
+        // --- STARTUP ---
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                console.log("System: User Logged In", user.displayName);
+                document.getElementById('user-name').innerText = user.displayName;
+                document.getElementById('user-info').classList.remove('hidden');
+                document.getElementById('google-signin-btn').classList.add('hidden');
+                initSync();
+            } else {
+                console.log("System: No User");
+                document.getElementById('user-info').classList.add('hidden');
+                document.getElementById('google-signin-btn').classList.remove('hidden');
+            }
+        });
+
+        getRedirectResult(auth).then(() => console.log("System: Auth Redirect Handled")).catch(e => console.error("Auth Error:", e));
+
+        setInterval(() => {
+            const diff = raceDate - new Date();
+            document.getElementById('countdown').innerText = Math.max(0, Math.floor(diff / 864e5));
+        }, 1000);
+
+        console.log("System: Script Loaded Successfully.");
+    </script>
+</body>
+</html>
