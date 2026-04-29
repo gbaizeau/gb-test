@@ -13,10 +13,9 @@
         .today-run-highlight { border-left: 4px solid #14b8a6; background-color: #f0fdfa !important; }
         .week-container.collapsed .week-content { display: none; }
         .week-header { cursor: pointer; transition: background 0.2s; }
-        .rest-day-row { opacity: 0.4; filter: grayscale(1); background-color: #f8fafc; }
+        .rest-day-row { opacity: 0.3; filter: grayscale(1); background-color: #f8fafc; }
         .comment-item { animation: fadeIn 0.3s ease; border-left: 2px solid #2dd4bf; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-        /* Custom Toggle Switch */
         .switch { position: relative; display: inline-block; width: 34px; height: 20px; }
         .switch input { opacity: 0; width: 0; height: 0; }
         .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #e2e8f0; transition: .4s; border-radius: 20px; }
@@ -46,17 +45,15 @@
 
     <div class="container mx-auto p-4 md:p-8 mt-24">
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            
             <aside class="space-y-6">
                 <section class="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-100 text-center">
                     <div id="countdown" class="text-6xl font-black text-teal-600 tracking-tighter">--</div>
-                    <p class="text-[10px] text-slate-400 font-black uppercase mt-2 tracking-widest">Days to the Melbourne Marathon</p>
+                    <p class="text-[10px] text-slate-400 font-black uppercase mt-2 tracking-widest">Days to Melbourne</p>
                 </section>
-
                 <section class="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
-                    <h2 class="text-xs font-black text-slate-400 uppercase mb-4 tracking-widest">Strava Activity Inbox</h2>
-                    <div id="strava-inbox" class="space-y-3">
-                        <p class="text-xs text-slate-300 italic">Sign in to match your runs...</p>
+                    <h2 class="text-xs font-black text-slate-400 uppercase mb-4 tracking-widest text-center">Activity Inbox</h2>
+                    <div id="strava-inbox" class="space-y-3 text-center">
+                        <p class="text-xs text-slate-300 italic">No runs detected.</p>
                     </div>
                 </section>
             </aside>
@@ -66,12 +63,12 @@
                     <div class="mb-8 flex justify-between items-center">
                         <div>
                             <h2 class="text-4xl font-black text-slate-900 tracking-tighter" id="display-name">Mimi's Plan</h2>
-                            <p class="text-teal-600 text-[10px] font-black mt-1 uppercase tracking-widest" id="display-goal">October 11, 2026</p>
+                            <p class="text-teal-600 text-[10px] font-black mt-1 uppercase tracking-widest">October 11, 2026</p>
                         </div>
                         <div class="flex items-center space-x-3 bg-slate-50 px-4 py-2 rounded-2xl border border-slate-100">
                             <span class="text-[10px] font-black text-slate-400 uppercase">Hide Rest</span>
                             <label class="switch">
-                                <input type="checkbox" id="hide-rest-toggle" checked onchange="renderPlan()">
+                                <input type="checkbox" id="hide-rest-toggle" checked onchange="window.renderPlan()">
                                 <span class="slider"></span>
                             </label>
                         </div>
@@ -85,7 +82,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.7/firebase-app.js";
         import { getFirestore, doc, onSnapshot, setDoc, updateDoc, collection, query, where, arrayUnion } from "https://www.gstatic.com/firebasejs/9.6.7/firebase-firestore.js";
-        import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.6.7/firebase-auth.js";
+        import { getAuth, GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.6.7/firebase-auth.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyAscCQCTKwszBKcHlaJB5Zgm0X_dOUPw5Y",
@@ -93,3 +90,82 @@
             projectId: "melbmara2026",
             storageBucket: "melbmara2026.firebasestorage.app",
             messagingSenderId: "968047511570",
+            appId: "1:968047511570:web:367e6129673359b61430cb"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        const provider = new GoogleAuthProvider();
+
+        const planStartDate = new Date("2026-07-20T00:00:00");
+        const raceDate = new Date("2026-10-11T08:00:00");
+
+        let activeUser = "mimi";
+        let trainingPlanData = []; 
+        let runLogData = {};
+        let stravaInboxData = [];
+        let expandedWeeks = new Set();
+
+        const currentWeekNum = Math.max(1, Math.min(12, Math.floor((new Date() - planStartDate) / (7 * 864e5)) + 1));
+        expandedWeeks.add(currentWeekNum);
+
+        // Core Functions
+        const getWorkoutDate = (wIdx, dIdx) => {
+            const d = new Date(planStartDate);
+            d.setDate(d.getDate() + (wIdx * 7) + dIdx);
+            return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
+        };
+
+        // This needs to be local for initSync AND global for the toggle
+        const renderPlan = () => {
+            const container = document.getElementById('plan-container');
+            const hideRest = document.getElementById('hide-rest-toggle')?.checked || false;
+            container.innerHTML = '';
+
+            trainingPlanData.forEach((week) => {
+                const isExpanded = expandedWeeks.has(week.week);
+                const weekDiv = document.createElement('div');
+                weekDiv.className = `week-container rounded-[1.5rem] border border-slate-100 overflow-hidden transition-all ${isExpanded ? 'bg-white shadow-md' : 'bg-slate-50 opacity-60'}`;
+                
+                weekDiv.innerHTML = `
+                    <div class="week-header p-5 flex justify-between items-center bg-white" onclick="window.toggleWeek(${week.week})">
+                        <div class="flex items-center space-x-3">
+                            <span class="font-black text-slate-300 uppercase text-[10px] tracking-widest">Week ${week.week}</span>
+                            ${week.week === currentWeekNum ? '<span class="bg-teal-500 text-white text-[8px] font-black px-2 py-0.5 rounded-full uppercase">Current</span>' : ''}
+                        </div>
+                        <span class="text-[10px] font-black text-slate-400 uppercase">${isExpanded ? 'Collapse' : 'Expand'}</span>
+                    </div>
+                    <div class="week-content ${isExpanded ? '' : 'hidden'} border-t border-slate-50">
+                        <table class="w-full text-left text-sm"><tbody id="week-body-${week.week}"></tbody></table>
+                    </div>
+                `;
+                
+                const tbody = weekDiv.querySelector('tbody');
+                const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+                days.forEach((day, dIdx) => {
+                    const workout = week[day] || "Rest";
+                    const isRest = workout.toLowerCase() === 'rest';
+                    if (hideRest && isRest) return;
+
+                    const runId = `w${week.week}d${dIdx}`;
+                    const log = runLogData[runId] || { status: 'pending', comments: [] };
+                    const tr = document.createElement('tr');
+                    tr.className = `border-b border-slate-50 ${isRest ? 'rest-day-row' : ''} ${week.week === currentWeekNum ? 'today-run-highlight' : ''}`;
+                    
+                    tr.innerHTML = `
+                        <td class="p-6 w-24 align-top">
+                            <p class="text-[10px] font-black text-slate-300 uppercase leading-none">${day}</p>
+                            <p class="text-xs font-bold text-slate-600">${getWorkoutDate(week.week-1, dIdx)}</p>
+                        </td>
+                        <td class="p-6 align-top">
+                            <div class="flex flex-col">
+                                <span class="text-base font-bold text-slate-800 ${log.status==='completed'?'line-through opacity-40':''}">${workout}</span>
+                                <p class="text-xs text-slate-500 mt-1 font-medium">${week[day+'_Detail'] || ''}</p>
+                                ${!isRest ? `
+                                    <div class="mt-4 space-y-2">
+                                        <div class="space-y-1.5">${(log.comments || []).map(c => `<div class="comment-item text-[11px] bg-slate-50 p-2.5 rounded-xl border border-slate-100"><span class="font-black text-teal-600 uppercase text-[9px] mr-1">${c.user}:</span><span class="text-slate-600 font-medium">${c.text}</span></div>`).join('')}</div>
+                                        <div class="flex mt-3 shadow-sm rounded-xl overflow-hidden border border-slate-100">
+                                            <input type="text" id="input-${runId}" placeholder="Leave a note..." class="bg-white border-none text-[11px] px-4 py-2 w-full focus:ring-0">
+                                            <button onclick="window.postComment('${runId}')" class="bg-slate-900 text-white px-4 text-[10px] font-black uppercase tracking-widest">
