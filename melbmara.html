@@ -13,16 +13,15 @@
         .chart-container { position: relative; width: 100%; height: 280px; }
         .bg-teal-50 { background-color: #f0fdfa; } 
         .today-run-highlight { border-left: 4px solid #2dd4bf; background-color: #ccfbf1 !important; }
-        .strava-card { transition: all 0.2s ease; border: 1px solid #e2e8f0; border-radius: 1rem; padding: 1.25rem; background: white; }
+        .strava-card { transition: all 0.2s ease; border: 1px solid #e2e8f0; border-radius: 1rem; padding: 1.25rem; background: white; margin-bottom: 1rem; }
         .strava-card:hover { transform: translateY(-3px); box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1); }
-        .table-cell-top { vertical-align: top; }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800">
 
-    <nav class="fixed top-0 w-full bg-white/80 backdrop-blur-md border-b border-slate-200 z-50 px-6 py-3 flex justify-between items-center">
+    <nav class="fixed top-0 w-full bg-white/90 backdrop-blur-md border-b border-slate-200 z-50 px-6 py-3 flex justify-between items-center">
         <div class="flex items-center space-x-6">
-            <h1 class="text-xl font-bold text-slate-900 tracking-tight">Melbourne 2026 Hub</h1>
+            <h1 class="text-xl font-bold text-slate-900 tracking-tight text-teal-600">MELB '26</h1>
             <div class="flex bg-slate-100 p-1 rounded-xl">
                 <button onclick="switchProfile('mimi')" id="btn-mimi" class="px-6 py-1.5 rounded-lg text-sm font-semibold transition-all bg-white shadow-sm text-teal-600">Mimi</button>
                 <button onclick="switchProfile('gregou')" id="btn-gregou" class="px-6 py-1.5 rounded-lg text-sm font-semibold transition-all text-slate-500">Gregou</button>
@@ -31,52 +30,36 @@
         <div id="auth-container">
             <button id="google-signin-btn" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-xl text-sm font-bold transition-all">Sign in</button>
             <div id="user-info" class="hidden flex items-center space-x-4">
-                <span id="user-name" class="text-sm font-semibold text-slate-700"></span>
-                <button id="signout-btn" class="text-xs text-red-500 font-bold uppercase tracking-widest hover:text-red-700">Sign Out</button>
+                <span id="user-name" class="text-sm font-semibold"></span>
+                <button id="signout-btn" class="text-xs text-red-500 font-bold uppercase hover:text-red-700">Sign Out</button>
             </div>
         </div>
     </nav>
 
     <div class="container mx-auto p-4 md:p-8 mt-24">
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            
             <aside class="space-y-8">
-                <section class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-                    <h2 class="text-lg font-bold mb-4 flex items-center text-slate-800">Weekly Volume 📈</h2>
-                    <div class="chart-container">
-                        <canvas id="mileageChart"></canvas>
-                    </div>
-                </section>
-
-                <section class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-                    <h2 class="text-lg font-bold mb-4 flex items-center text-slate-800">📥 Strava Matcher</h2>
-                    <div id="strava-inbox" class="space-y-4">
-                        <p class="text-sm text-slate-400 italic">Sign in to sync your runs.</p>
-                    </div>
-                </section>
-
                 <section class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 text-center">
                     <div id="countdown" class="text-5xl font-black text-teal-600 tracking-tighter">--</div>
-                    <p class="text-xs text-slate-400 font-bold uppercase mt-2">Days to Melbourne</p>
+                    <p class="text-xs text-slate-400 font-bold uppercase mt-2">Days to Race Day</p>
                 </section>
-
                 <section class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-                    <h2 class="text-lg font-bold mb-3 text-slate-800">Training Tips 💡</h2>
-                    <div class="text-sm space-y-4 text-slate-600 leading-relaxed">
-                        <p><strong>Pacing:</strong> Mimi's Goal: 5:41/km | Gregou's Goal: 4:30/km.</p>
-                        <p><strong>Matching:</strong> The system suggests the best day based on date and distance automatically.</p>
-                    </div>
+                    <h2 class="text-lg font-bold mb-4">Volume Tracker 📈</h2>
+                    <div class="chart-container"><canvas id="mileageChart"></canvas></div>
+                </section>
+                <section class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+                    <h2 class="text-lg font-bold mb-4">📥 Strava Inbox</h2>
+                    <div id="strava-inbox" class="space-y-4"></div>
                 </section>
             </aside>
 
-            <div class="lg:col-span-2 space-y-8">
+            <div class="lg:col-span-2">
                 <section class="bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
-                    <div class="mb-8 flex justify-between items-start">
+                    <div class="mb-8 flex justify-between items-end">
                         <div>
                             <h2 class="text-3xl font-black text-slate-900" id="display-name">Mimi's Training Plan</h2>
-                            <p class="text-slate-400 text-sm font-medium mt-1">Live from Google Sheets</p>
+                            <p class="text-slate-400 text-sm font-medium">Dynamic Plan • Synced via Sheets</p>
                         </div>
-                        <div id="weekly-motivation" class="text-right max-w-xs text-xs italic text-teal-600 font-medium"></div>
                     </div>
                     <div id="plan-container" class="overflow-x-auto"></div>
                 </section>
@@ -86,7 +69,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.7/firebase-app.js";
-        import { getFirestore, doc, onSnapshot, setDoc, updateDoc, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/9.6.7/firebase-firestore.js";
+        import { getFirestore, doc, onSnapshot, setDoc, updateDoc, collection, query, where } from "https://www.gstatic.com/firebasejs/9.6.7/firebase-firestore.js";
         import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.6.7/firebase-auth.js";
 
         const firebaseConfig = {
@@ -121,7 +104,6 @@
         function initSync() {
             const userPath = `users/${activeUser}`;
             
-            // 1. Fetch Dynamic Plan (from Sheets)
             onSnapshot(collection(db, userPath, "planData"), (snap) => {
                 trainingPlanData = [];
                 snap.forEach(d => {
@@ -133,7 +115,6 @@
                 renderChart();
             });
 
-            // 2. Fetch User Logs
             onSnapshot(collection(db, userPath, "runLogs"), (snap) => {
                 runLogData = {};
                 snap.forEach(d => runLogData[d.id] = d.data());
@@ -141,9 +122,7 @@
                 renderChart();
             });
 
-            // 3. Fetch Strava Inbox
-            const inboxQuery = query(collection(db, userPath, "stravaInbox"), where("status", "==", "pending"));
-            onSnapshot(inboxQuery, (snap) => {
+            onSnapshot(query(collection(db, userPath, "stravaInbox"), where("status", "==", "pending")), (snap) => {
                 stravaInboxData = [];
                 snap.forEach(d => stravaInboxData.push({ id: d.id, ...d.data() }));
                 renderInbox();
@@ -153,36 +132,41 @@
         function renderPlan() {
             const container = document.getElementById('plan-container');
             if (trainingPlanData.length === 0) {
-                container.innerHTML = '<p class="text-slate-400 italic p-8 text-center">Opening the connection to Google Sheets...</p>';
+                container.innerHTML = '<p class="text-slate-400 italic p-8 text-center">Loading your plan...</p>';
                 return;
             }
             container.innerHTML = '';
             const table = document.createElement('table');
             table.className = 'w-full text-left border-collapse text-sm';
             
+            const daysToMatch = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
             trainingPlanData.forEach((week, wIdx) => {
-                const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-                days.forEach((day, dIdx) => {
+                daysToMatch.forEach((dayName, dIdx) => {
                     const runId = `w${week.week}d${dIdx}`;
                     const log = runLogData[runId] || { status: 'pending' };
-                    const workout = week[day] || "Rest";
-                    
+                    const workout = week[dayName] || "Rest";
+                    const detail = week[`${dayName}_Detail`] || "";
+
                     const tr = document.createElement('tr');
                     tr.className = `border-b border-slate-100 hover:bg-slate-50/50 transition-colors ${log.status === 'completed' ? 'bg-teal-50/30' : ''}`;
                     tr.innerHTML = `
-                        <td class="py-4 px-2 font-bold text-slate-300 w-12 table-cell-top">${dIdx === 0 ? week.week : ''}</td>
-                        <td class="py-4 w-24 table-cell-top">
-                             <p class="text-[10px] font-black text-slate-300 uppercase leading-none">${day}</p>
+                        <td class="py-5 px-2 font-bold text-slate-300 w-12 align-top">${dIdx === 0 ? week.week : ''}</td>
+                        <td class="py-5 w-24 align-top">
+                             <p class="text-[10px] font-black text-slate-300 uppercase leading-none">${dayName}</p>
                              <p class="text-xs font-bold text-slate-500">${getWorkoutDate(week.week - 1, dIdx)}</p>
                         </td>
-                        <td class="py-4">
-                            <div class="flex items-center space-x-3">
-                                <span class="h-2 w-2 rounded-full ${log.status === 'completed' ? 'bg-teal-500' : 'bg-slate-200'}"></span>
-                                <span class="font-semibold ${log.status === 'completed' ? 'line-through text-slate-400' : 'text-slate-700'}">${workout}</span>
+                        <td class="py-5">
+                            <div class="flex items-start space-x-3">
+                                <span class="h-2 w-2 rounded-full mt-1.5 ${log.status === 'completed' ? 'bg-teal-500' : 'bg-slate-200'}"></span>
+                                <div>
+                                    <span class="font-bold text-base ${log.status === 'completed' ? 'line-through text-slate-400' : 'text-slate-800'}">${workout}</span>
+                                    ${detail ? `<p class="text-xs text-slate-500 mt-1 leading-relaxed">${detail}</p>` : ''}
+                                    ${log.actualDistance ? `<p class="text-[10px] font-black text-teal-600 mt-2 uppercase tracking-tighter">★ Logged: ${log.actualDistance}KM</p>` : ''}
+                                </div>
                             </div>
-                            ${log.actualDistance ? `<p class="text-[10px] font-black text-teal-600 ml-5 mt-1">LOGGED: ${log.actualDistance}KM in ${log.actualTime}</p>` : ''}
                         </td>
-                        <td class="py-4 text-right">
+                        <td class="py-5 text-right align-top">
                              ${log.status === 'completed' ? 
                                 `<button onclick="unmatchRun('${runId}', '${log.stravaId}')" class="text-[10px] font-black text-red-300 hover:text-red-500 uppercase tracking-tighter transition-colors">Unmatch</button>` : 
                                 `<button onclick="matchBestFit('${runId}')" class="bg-slate-100 border border-slate-200 px-3 py-1 rounded-lg text-[10px] font-black text-slate-400 hover:border-teal-500 hover:text-teal-600 transition-all uppercase">Match</button>`}
@@ -194,9 +178,10 @@
             container.appendChild(table);
         }
 
-        // --- CHART LOGIC (Restored from Original) ---
         function renderChart() {
-            const ctx = document.getElementById('mileageChart').getContext('2d');
+            const canvas = document.getElementById('mileageChart');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
             const planned = trainingPlanData.map(w => parseFloat(w.totalKm || 0));
             const actuals = trainingPlanData.map(w => {
                 let sum = 0;
@@ -208,22 +193,35 @@
             mileageChartInstance = new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: trainingPlanData.map(w => `Wk ${w.week}`),
+                    labels: trainingPlanData.map(w => `W ${w.week}`),
                     datasets: [
-                        { label: 'Target', data: planned, backgroundColor: '#f1f5f9', borderRadius: 5 },
-                        { label: 'Actual', data: actuals, backgroundColor: '#14b8a6', borderRadius: 5 }
+                        { label: 'Actual', data: actuals, backgroundColor: '#14b8a6', borderRadius: 4, barThickness: 12 },
+                        { label: 'Target', data: planned, backgroundColor: '#f1f5f9', borderRadius: 4, barThickness: 12 }
                     ]
                 },
                 options: { 
                     responsive: true, 
-                    maintainAspectRatio: false,
+                    maintainAspectRatio: false, 
                     plugins: { legend: { display: false } },
-                    scales: { y: { beginAtZero: true, grid: { display: false } }, x: { grid: { display: false } } }
+                    scales: { y: { display: false }, x: { grid: { display: false }, border: { display: false } } }
                 }
             });
         }
 
-        // --- AUTH & TOGGLES ---
+        function renderInbox() {
+            const container = document.getElementById('strava-inbox');
+            container.innerHTML = stravaInboxData.length === 0 ? '<p class="text-sm text-slate-400 italic">No runs to match.</p>' : '';
+            stravaInboxData.forEach(run => {
+                const card = document.createElement('div');
+                card.className = 'strava-card';
+                card.innerHTML = `
+                    <p class="text-sm font-bold text-slate-800">${run.distance}km @ ${run.date}</p>
+                    <button onclick="autoAssign('${run.id}', ${run.distance}, '${run.date}', '${run.time}')" class="w-full mt-3 bg-slate-900 text-white text-[10px] font-bold py-2 rounded-lg hover:bg-teal-600 transition-colors uppercase">Assign to Plan</button>
+                `;
+                container.appendChild(card);
+            });
+        }
+
         window.switchProfile = (name) => {
             activeUser = name;
             document.getElementById('display-name').innerText = name.charAt(0).toUpperCase() + name.slice(1) + "'s Plan";
@@ -248,7 +246,6 @@
             const diff = raceDate - new Date();
             document.getElementById('countdown').innerText = Math.floor(diff / 864e5);
         }, 1000);
-
     </script>
 </body>
 </html>
