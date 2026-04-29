@@ -6,36 +6,41 @@
     <title>Melbourne 2026 Marathon Hub</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Inter', sans-serif; }
-        .chart-container { position: relative; width: 100%; height: 250px; }
+        body { font-family: 'Inter', sans-serif; letter-spacing: -0.01em; }
         .bg-teal-50 { background-color: #f0fdfa; } 
         .today-run-highlight { border-left: 4px solid #14b8a6; background-color: #f0fdfa !important; }
         .week-container.collapsed .week-content { display: none; }
         .week-header { cursor: pointer; transition: background 0.2s; }
-        .week-header:hover { background-color: #f8fafc; }
-        /* Smooth transitions for comments */
-        .comment-item { animation: fadeIn 0.3s ease; }
+        .rest-day-row { opacity: 0.4; filter: grayscale(1); background-color: #f8fafc; }
+        .comment-item { animation: fadeIn 0.3s ease; border-left: 2px solid #2dd4bf; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        /* Custom Toggle Switch */
+        .switch { position: relative; display: inline-block; width: 34px; height: 20px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #e2e8f0; transition: .4s; border-radius: 20px; }
+        .slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: #14b8a6; }
+        input:checked + .slider:before { transform: translateX(14px); }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-900">
 
     <nav class="fixed top-0 w-full bg-white/90 backdrop-blur-md border-b border-slate-200 z-50 px-6 py-3 flex justify-between items-center">
         <div class="flex items-center space-x-6">
-            <h1 class="text-xl font-bold tracking-tighter text-teal-600">MELB '26</h1>
+            <h1 class="text-xl font-black tracking-tighter text-teal-600">MELB '26</h1>
             <div class="flex bg-slate-100 p-1 rounded-xl">
                 <button onclick="switchProfile('mimi')" id="btn-mimi" class="px-6 py-1.5 rounded-lg text-sm font-semibold transition-all bg-white shadow-sm text-teal-600">Mimi</button>
                 <button onclick="switchProfile('gregou')" id="btn-gregou" class="px-6 py-1.5 rounded-lg text-sm font-semibold transition-all text-slate-500">Gregou</button>
             </div>
         </div>
         <div id="auth-container" class="flex items-center space-x-4">
-            <button id="google-signin-btn" class="bg-blue-600 text-white px-5 py-2 rounded-xl text-sm font-bold">Sign in</button>
-            <div id="user-info" class="hidden flex items-center space-x-4">
-                <span id="user-name" class="text-sm font-semibold"></span>
-                <button id="signout-btn" class="text-xs text-red-500 font-bold uppercase">Sign Out</button>
+            <div id="user-info" class="hidden flex items-center space-x-3">
+                <span id="user-name" class="text-sm font-bold text-slate-700"></span>
+                <button id="signout-btn" class="text-[10px] bg-slate-100 px-2 py-1 rounded-md text-slate-400 font-bold uppercase hover:bg-red-50 hover:text-red-500 transition-all">Sign Out</button>
             </div>
+            <button id="google-signin-btn" class="bg-blue-600 text-white px-5 py-2 rounded-xl text-sm font-bold shadow-lg shadow-blue-100">Sign in</button>
         </div>
     </nav>
 
@@ -43,34 +48,35 @@
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
             
             <aside class="space-y-6">
-                <section class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 text-center">
-                    <div id="countdown" class="text-5xl font-black text-teal-600 tracking-tighter">--</div>
-                    <p class="text-xs text-slate-400 font-bold uppercase mt-2">Days to the Finish Line</p>
+                <section class="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-100 text-center">
+                    <div id="countdown" class="text-6xl font-black text-teal-600 tracking-tighter">--</div>
+                    <p class="text-[10px] text-slate-400 font-black uppercase mt-2 tracking-widest">Days to the Melbourne Marathon</p>
                 </section>
 
-                <section class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-                    <h2 class="text-sm font-bold text-slate-400 uppercase mb-4 tracking-widest">Dashboard Settings</h2>
-                    <label class="flex items-center space-x-3 cursor-pointer group">
-                        <input type="checkbox" id="hide-rest-toggle" checked onchange="renderPlan()" class="w-5 h-5 accent-teal-600 rounded">
-                        <span class="text-sm font-semibold text-slate-600 group-hover:text-teal-600 transition-colors">Hide Rest Days</span>
-                    </label>
-                </section>
-
-                <section class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-                    <h2 class="text-sm font-bold text-slate-400 uppercase mb-4 tracking-widest">Strava Sync</h2>
-                    <div id="strava-inbox" class="space-y-4"></div>
+                <section class="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
+                    <h2 class="text-xs font-black text-slate-400 uppercase mb-4 tracking-widest">Strava Activity Inbox</h2>
+                    <div id="strava-inbox" class="space-y-3">
+                        <p class="text-xs text-slate-300 italic">Sign in to match your runs...</p>
+                    </div>
                 </section>
             </aside>
 
             <div class="lg:col-span-2 space-y-6">
-                <section class="bg-white p-2 md:p-6 rounded-3xl shadow-sm border border-slate-100">
-                    <div class="p-4 mb-4 border-b border-slate-50 flex justify-between items-end">
+                <section class="bg-white p-4 md:p-8 rounded-[2rem] shadow-sm border border-slate-100">
+                    <div class="mb-8 flex justify-between items-center">
                         <div>
-                            <h2 class="text-3xl font-black text-slate-900 leading-none" id="display-name">Mimi's Plan</h2>
-                            <p class="text-slate-400 text-xs font-bold mt-2 uppercase tracking-widest">October 11, 2026</p>
+                            <h2 class="text-4xl font-black text-slate-900 tracking-tighter" id="display-name">Mimi's Plan</h2>
+                            <p class="text-teal-600 text-[10px] font-black mt-1 uppercase tracking-widest" id="display-goal">October 11, 2026</p>
+                        </div>
+                        <div class="flex items-center space-x-3 bg-slate-50 px-4 py-2 rounded-2xl border border-slate-100">
+                            <span class="text-[10px] font-black text-slate-400 uppercase">Hide Rest</span>
+                            <label class="switch">
+                                <input type="checkbox" id="hide-rest-toggle" checked onchange="renderPlan()">
+                                <span class="slider"></span>
+                            </label>
                         </div>
                     </div>
-                    <div id="plan-container" class="space-y-4"></div>
+                    <div id="plan-container" class="space-y-6"></div>
                 </section>
             </div>
         </div>
@@ -87,197 +93,3 @@
             projectId: "melbmara2026",
             storageBucket: "melbmara2026.firebasestorage.app",
             messagingSenderId: "968047511570",
-            appId: "1:968047511570:web:367e6129673359b61430cb"
-        };
-
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-        const auth = getAuth(app);
-        const provider = new GoogleAuthProvider();
-
-        const planStartDate = new Date("2026-07-20T00:00:00");
-        const raceDate = new Date("2026-10-11T08:00:00");
-
-        let activeUser = "mimi";
-        let trainingPlanData = []; 
-        let runLogData = {};
-        let stravaInboxData = [];
-        let expandedWeeks = new Set();
-
-        // Calculate Current Week
-        function getCurrentWeekNum() {
-            const today = new Date();
-            const diffInMs = today - planStartDate;
-            const weekNum = Math.floor(diffInMs / (7 * 864e5)) + 1;
-            return Math.max(1, Math.min(12, weekNum));
-        }
-
-        const currentWeekNum = getCurrentWeekNum();
-        expandedWeeks.add(currentWeekNum);
-
-        function getWorkoutDate(wIdx, dIdx) {
-            const d = new Date(planStartDate);
-            d.setDate(d.getDate() + (wIdx * 7) + dIdx);
-            return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
-        }
-
-        function initSync() {
-            const userPath = `users/${activeUser}`;
-            
-            onSnapshot(collection(db, userPath, "planData"), (snap) => {
-                trainingPlanData = [];
-                snap.forEach(d => trainingPlanData.push({ week: parseInt(d.id.replace('week','')), ...d.data() }));
-                trainingPlanData.sort((a, b) => a.week - b.week);
-                renderPlan();
-            });
-
-            onSnapshot(collection(db, userPath, "runLogs"), (snap) => {
-                runLogData = {};
-                snap.forEach(d => runLogData[d.id] = d.data());
-                renderPlan();
-            });
-
-            onSnapshot(query(collection(db, userPath, "stravaInbox"), where("status", "==", "pending")), (snap) => {
-                stravaInboxData = [];
-                snap.forEach(d => stravaInboxData.push({ id: d.id, ...d.data() }));
-                renderInbox();
-            });
-        }
-
-        // TOGGLE WEEK COLLAPSE
-        window.toggleWeek = (num) => {
-            if (expandedWeeks.has(num)) expandedWeeks.delete(num);
-            else expandedWeeks.add(num);
-            renderPlan();
-        };
-
-        // RENDER PLAN
-        function renderPlan() {
-            const container = document.getElementById('plan-container');
-            const hideRest = document.getElementById('hide-rest-toggle').checked;
-            container.innerHTML = '';
-
-            trainingPlanData.forEach((week) => {
-                const isExpanded = expandedWeeks.has(week.week);
-                const weekDiv = document.createElement('div');
-                weekDiv.className = `week-container rounded-2xl border border-slate-100 overflow-hidden ${isExpanded ? 'bg-white' : 'bg-slate-50 opacity-60'}`;
-                
-                weekDiv.innerHTML = `
-                    <div class="week-header p-4 flex justify-between items-center bg-white" onclick="toggleWeek(${week.week})">
-                        <span class="font-black text-slate-300 uppercase text-xs">Week ${week.week}</span>
-                        <span class="text-xs font-bold text-slate-500">${isExpanded ? 'Collapse' : 'Expand'}</span>
-                    </div>
-                    <div class="week-content ${isExpanded ? '' : 'hidden'} border-t border-slate-50">
-                        <table class="w-full text-left text-sm">
-                            <tbody id="week-body-${week.week}"></tbody>
-                        </table>
-                    </div>
-                `;
-                
-                const tbody = weekDiv.querySelector('tbody');
-                const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-
-                days.forEach((day, dIdx) => {
-                    const workout = week[day] || "Rest";
-                    if (hideRest && workout.toLowerCase() === 'rest') return;
-
-                    const runId = `w${week.week}d${dIdx}`;
-                    const log = runLogData[runId] || { status: 'pending', comments: [] };
-                    const tr = document.createElement('tr');
-                    tr.className = `border-b border-slate-50 hover:bg-slate-50/30 ${week.week === currentWeekNum ? 'today-run-highlight' : ''}`;
-                    
-                    tr.innerHTML = `
-                        <td class="p-4 w-20 align-top">
-                            <p class="text-[10px] font-black text-slate-300 uppercase leading-none">${day}</p>
-                            <p class="text-xs font-bold text-slate-500">${getWorkoutDate(week.week-1, dIdx)}</p>
-                        </td>
-                        <td class="p-4 align-top">
-                            <div>
-                                <span class="font-bold text-slate-800 ${log.status==='completed'?'line-through opacity-40':''}">${workout}</span>
-                                <p class="text-[11px] text-slate-500 mt-1">${week[day+'_Detail'] || ''}</p>
-                                
-                                <div class="mt-4 space-y-2">
-                                    <div id="comments-${runId}" class="space-y-2">
-                                        ${(log.comments || []).map(c => `
-                                            <div class="comment-item text-[10px] bg-slate-100 p-2 rounded-lg">
-                                                <span class="font-black text-teal-600 uppercase">${c.user}:</span> ${c.text}
-                                            </div>
-                                        `).join('')}
-                                    </div>
-                                    <div class="flex mt-2">
-                                        <input type="text" id="input-${runId}" placeholder="Add a comment..." class="bg-slate-50 border-none text-[10px] rounded-l-lg w-full focus:ring-1 focus:ring-teal-500">
-                                        <button onclick="postComment('${runId}')" class="bg-teal-500 text-white px-3 rounded-r-lg text-[10px] font-bold">Post</button>
-                                    </div>
-                                </div>
-                            </div>
-                        </td>
-                        <td class="p-4 text-right align-top">
-                            <button onclick="matchBestFit('${runId}')" class="bg-white border border-slate-200 px-3 py-1 rounded-lg text-[10px] font-black text-slate-400 hover:text-teal-600 uppercase">Match</button>
-                        </td>
-                    `;
-                    tbody.appendChild(tr);
-                });
-                
-                if (tbody.children.length > 0) container.appendChild(weekDiv);
-            });
-        }
-
-        // SOCIAL: Post Comment
-        window.postComment = async (runId) => {
-            const input = document.getElementById(`input-${runId}`);
-            if (!input.value || !auth.currentUser) return;
-
-            const userPath = `users/${activeUser}`;
-            await setDoc(doc(db, userPath, "runLogs", runId), {
-                comments: arrayUnion({
-                    user: auth.currentUser.displayName.split(' ')[0], // Uses "Gregou" or "Mimi"
-                    text: input.value,
-                    ts: Date.now()
-                })
-            }, { merge: true });
-
-            input.value = '';
-        };
-
-        // --- PREVIOUS AUTH & SIDEBAR LOGIC ---
-        function renderInbox() {
-            const container = document.getElementById('strava-inbox');
-            container.innerHTML = stravaInboxData.length === 0 ? '<p class="text-[10px] text-slate-400 italic">Everything is matched!</p>' : '';
-            stravaInboxData.forEach(run => {
-                const card = document.createElement('div');
-                card.className = 'bg-slate-50 p-3 rounded-xl border border-slate-100';
-                card.innerHTML = `
-                    <p class="text-xs font-bold text-slate-800">${run.distance}km @ ${run.date}</p>
-                    <button class="w-full mt-2 bg-slate-900 text-white text-[10px] font-bold py-1.5 rounded-lg uppercase">Assign</button>
-                `;
-                container.appendChild(card);
-            });
-        }
-
-        window.switchProfile = (name) => {
-            activeUser = name;
-            document.getElementById('display-name').innerText = name.charAt(0).toUpperCase() + name.slice(1) + "'s Plan";
-            document.getElementById('btn-mimi').className = name === 'mimi' ? 'px-6 py-1.5 rounded-lg text-sm font-semibold bg-white shadow-sm text-teal-600' : 'px-6 py-1.5 rounded-lg text-sm font-semibold text-slate-500';
-            document.getElementById('btn-gregou').className = name === 'gregou' ? 'px-6 py-1.5 rounded-lg text-sm font-semibold bg-white shadow-sm text-teal-600' : 'px-6 py-1.5 rounded-lg text-sm font-semibold text-slate-500';
-            initSync();
-        };
-
-        onAuthStateChanged(auth, (user) => {
-            if (user) {
-                document.getElementById('user-name').innerText = user.displayName;
-                document.getElementById('user-info').classList.remove('hidden');
-                document.getElementById('google-signin-btn').classList.add('hidden');
-                initSync();
-            }
-        });
-
-        document.getElementById('google-signin-btn').onclick = () => signInWithPopup(auth, provider);
-        document.getElementById('signout-btn').onclick = () => signOut(auth);
-        
-        setInterval(() => {
-            const diff = raceDate - new Date();
-            document.getElementById('countdown').innerText = Math.floor(diff / 864e5);
-        }, 1000);
-    </script>
-</body>
-</html>
