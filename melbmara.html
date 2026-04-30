@@ -11,15 +11,12 @@
         body { font-family: 'Inter', sans-serif; letter-spacing: -0.01em; }
         .matched-row { background-color: #ecfdf5 !important; border-left: 4px solid #10b981 !important; }
         .pending-row { background-color: #f0f9ff !important; border-left: 4px solid #0ea5e9 !important; }
-        .week-header { cursor: pointer; transition: all 0.2s; }
         .rest-day-row { opacity: 0.25; filter: grayscale(1); background-color: #f8fafc; }
-        .comment-item { animation: fadeIn 0.3s ease; border-left: 2px solid #2dd4bf; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        .week-header { cursor: pointer; transition: all 0.2s; }
         #match-modal.active { display: flex !important; opacity: 1; }
         .map-track { position: relative; width: 100%; height: 80px; background: #f1f5f9; border-radius: 40px; border: 2px solid #e2e8f0; margin: 20px 0; }
         .avatar-marker { position: absolute; transition: all 1s cubic-bezier(0.34, 1.56, 0.64, 1); filter: drop-shadow(0 4px 6px rgba(0,0,0,0.1)); z-index: 10; }
-        #marker-mimi { top: -22px; } 
-        #marker-gregou { bottom: -22px; }
+        #marker-mimi { top: -22px; } #marker-gregou { bottom: -22px; }
         .avatar-bubble { background: white; border-radius: 50%; padding: 4px; border: 3px solid; width: 46px; height: 46px; display: flex; align-items: center; justify-content: center; font-size: 22px; }
         .switch { position: relative; display: inline-block; width: 34px; height: 20px; }
         .switch input { opacity: 0; width: 0; height: 0; }
@@ -33,10 +30,10 @@
 
     <div id="match-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] hidden flex-col items-center justify-center p-4 opacity-0 transition-opacity">
         <div class="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden p-8">
-            <h3 class="text-2xl font-black tracking-tighter text-slate-900 mb-2">Select Activity</h3>
-            <p id="modal-workout-info" class="text-xs font-bold text-sky-600 uppercase tracking-widest mb-6"></p>
+            <h3 class="text-2xl font-black tracking-tighter text-slate-900 mb-2 text-center">Select Activity</h3>
+            <p id="modal-workout-info" class="text-[10px] font-black text-sky-500 uppercase tracking-widest mb-6 text-center"></p>
             <div id="modal-run-list" class="space-y-3 max-h-[40vh] overflow-y-auto mb-8 pr-2"></div>
-            <button onclick="window.closeMatchModal()" class="w-full bg-slate-100 text-slate-400 py-4 rounded-2xl font-black uppercase text-xs tracking-widest">Cancel</button>
+            <button onclick="window.closeMatchModal()" class="w-full bg-slate-100 text-slate-400 py-4 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-slate-200 transition-all">Cancel</button>
         </div>
     </div>
 
@@ -99,8 +96,6 @@
         import { getFirestore, doc, onSnapshot, setDoc, collection, query, where, arrayUnion, getDocs, deleteDoc, getDoc } from "https://www.gstatic.com/firebasejs/9.6.7/firebase-firestore.js";
         import { getAuth, GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.6.7/firebase-auth.js";
 
-        console.log("System: Booting Master v6.1...");
-
         const firebaseConfig = {
             apiKey: "AIzaSyAscCQCTKwszBKcHlaJB5Zgm0X_dOUPw5Y",
             authDomain: "melbmara2026.firebaseapp.com",
@@ -128,7 +123,7 @@
         const currentWeekNum = Math.max(1, Math.min(12, Math.floor((new Date() - planStartDate) / (7 * 864e5)) + 1));
         expandedWeeks.add(currentWeekNum);
 
-        // --- GLOBAL ATTACHMENTS (IMMEDIATE) ---
+        // --- ATTACHED GLOBALLY FOR ACCESSIBILITY ---
 
         window.handleSignIn = () => signInWithRedirect(auth, provider);
         window.handleSignOut = () => signOut(auth);
@@ -211,7 +206,7 @@
                         </td>
                         <td class="p-6 text-right align-top">
                             ${!isRest ? (isCompleted ? 
-                                `<div><p class="text-[10px] font-black text-emerald-600 uppercase mb-2 leading-none">${log.actualDistance}km</p><button onclick="window.unmatchActivity('${runId}')" class="text-[10px] font-black text-slate-400 hover:text-red-500 uppercase tracking-tighter">Unmatch</button></div>` :
+                                `<div><p class="text-[10px] font-black text-emerald-600 uppercase mb-2 leading-none">${log.actualDistance}km Logged</p><button onclick="window.unmatchActivity('${runId}')" class="text-[10px] font-black text-slate-400 hover:text-red-500 uppercase tracking-tighter">Unmatch</button></div>` :
                                 `<button onclick="window.openMatchModal('${runId}', '${workout}', '${workoutDate.toISOString()}')" class="bg-white border border-slate-200 px-4 py-1.5 rounded-xl text-[10px] font-black text-sky-500 uppercase tracking-tighter hover:border-sky-500 transition-all">Match</button>`
                             ) : ''}
                         </td>
@@ -241,14 +236,19 @@
             const targetDate = new Date(isoDate);
             document.getElementById('modal-workout-info').innerText = `${workoutName} (${targetDate.toLocaleDateString('en-AU', {day:'numeric', month:'short'})})`;
             const sortedRuns = [...stravaInboxData].sort((a, b) => Math.abs(new Date(a.date) - targetDate) - Math.abs(new Date(b.date) - targetDate));
-            runList.innerHTML = sortedRuns.map(run => `<button onclick="window.confirmMatch('${runId}', '${run.id}', '${workoutName}', ${run.distance}, '${run.date}')" class="w-full text-left p-4 rounded-2xl border border-slate-100 bg-slate-50 hover:border-sky-500 flex justify-between items-center"><div><p class="text-sm font-black text-slate-900">${run.distance}km</p><p class="text-[10px] font-bold text-slate-500 uppercase mt-0.5">${run.date}</p></div><span class="text-[9px] font-black text-sky-600 uppercase tracking-widest">Match</span></button>`).join('');
+            runList.innerHTML = sortedRuns.map(run => `<button onclick="window.confirmMatch('${runId}', '${run.id}', '${workoutName}', ${run.distance}, '${run.date}')" class="w-full text-left p-4 rounded-2xl border border-slate-100 bg-slate-50 hover:border-sky-500 flex justify-between items-center group"><div class="flex flex-col"><p class="text-sm font-black text-slate-900 group-hover:text-sky-600 transition-colors">${run.distance}km</p><p class="text-[10px] font-bold text-slate-400 uppercase mt-0.5">${run.date}</p></div><span class="text-[9px] font-black text-sky-600 uppercase tracking-widest opacity-0 group-hover:opacity-100">Match</span></button>`).join('');
             modal.classList.add('active');
         };
 
         window.closeMatchModal = () => document.getElementById('match-modal').classList.remove('active');
 
-        window.confirmMatch = async (runId, activityId, workoutName, actualDist, originalDate) => {
-            await setDoc(doc(db, `users/${activeUser}`, "runLogs", runId), { actualDistance: actualDist, status: "completed", originalDate: originalDate, activityId: activityId }, { merge: true });
+        window.confirmMatch = async (runId, activityId, workoutName, actualDist, runDate) => {
+            await setDoc(doc(db, `users/${activeUser}`, "runLogs", runId), { 
+                actualDistance: actualDist, 
+                status: "completed", 
+                originalDate: runDate, // Save the specific date string
+                activityId: activityId 
+            }, { merge: true });
             await deleteDoc(doc(db, `users/${activeUser}/stravaInbox`, activityId));
             window.closeMatchModal();
         };
@@ -258,7 +258,11 @@
             const logRef = doc(db, `users/${activeUser}`, "runLogs", runId);
             const snap = await getDoc(logRef);
             const data = snap.data();
-            await setDoc(doc(db, `users/${activeUser}/stravaInbox`, data.activityId || `unmatch_${Date.now()}`), { distance: data.actualDistance, date: data.originalDate || "Unknown", status: "pending" });
+            await setDoc(doc(db, `users/${activeUser}/stravaInbox`, data.activityId || `unmatch_${Date.now()}`), { 
+                distance: data.actualDistance, 
+                date: data.originalDate || "2026-XX-XX", 
+                status: "pending" 
+            });
             await setDoc(logRef, { actualDistance: null, status: "pending", activityId: null, originalDate: null }, { merge: true });
         };
 
@@ -273,7 +277,7 @@
             input.value = '';
         };
 
-        // --- DATA ENGINE ---
+        // --- CORE SYNC ENGINE ---
 
         async function updateMap() {
             const users = ["mimi", "gregou"];
@@ -304,7 +308,6 @@
         }
 
         onAuthStateChanged(auth, (user) => {
-            console.log("System: Auth State Change", user ? "User In" : "User Out");
             if (user) {
                 document.getElementById('user-name').innerText = user.displayName;
                 document.getElementById('user-info').classList.remove('hidden');
@@ -316,7 +319,7 @@
             }
         });
 
-        getRedirectResult(auth).catch(e => console.error("Auth Error:", e));
+        getRedirectResult(auth).catch(e => console.error(e));
         setInterval(() => {
             const diff = raceDate - new Date();
             const el = document.getElementById('countdown');
