@@ -11,11 +11,12 @@
         body { font-family: 'Inter', sans-serif; letter-spacing: -0.01em; }
         .bg-teal-50 { background-color: #f0fdfa; } 
         .today-run-highlight { border-left: 4px solid #14b8a6; background-color: #f0fdfa !important; }
-        .week-header { cursor: pointer; transition: background 0.2s; }
+        .week-header { cursor: pointer; transition: all 0.2s; }
+        .week-header:hover { background-color: #f8fafc; }
         .rest-day-row { opacity: 0.25; filter: grayscale(1); background-color: #f8fafc; }
         .comment-item { animation: fadeIn 0.3s ease; border-left: 2px solid #2dd4bf; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-        /* Custom Toggle Switch */
+        /* Toggle Switch */
         .switch { position: relative; display: inline-block; width: 34px; height: 20px; }
         .switch input { opacity: 0; width: 0; height: 0; }
         .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #e2e8f0; transition: .4s; border-radius: 20px; }
@@ -53,7 +54,7 @@
                 <section class="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
                     <h2 class="text-xs font-black text-slate-400 uppercase mb-4 tracking-widest text-center">Activity Inbox</h2>
                     <div id="strava-inbox" class="space-y-3">
-                        <p class="text-xs text-slate-300 italic text-center">No runs to match.</p>
+                        <p class="text-xs text-slate-300 italic text-center">Sign in to see runs</p>
                     </div>
                 </section>
             </aside>
@@ -63,7 +64,7 @@
                     <div class="mb-8 flex justify-between items-center">
                         <div>
                             <h2 class="text-4xl font-black text-slate-900 tracking-tighter" id="display-name">Mimi's Plan</h2>
-                            <p class="text-teal-600 text-[10px] font-black mt-1 uppercase tracking-widest">Training for October 11</p>
+                            <p class="text-teal-600 text-[10px] font-black mt-1 uppercase tracking-widest">Target: Oct 11, 2026</p>
                         </div>
                         <div class="flex items-center space-x-3 bg-slate-50 px-4 py-2 rounded-2xl border border-slate-100">
                             <span class="text-[10px] font-black text-slate-400 uppercase">Hide Rest</span>
@@ -73,15 +74,15 @@
                             </label>
                         </div>
                     </div>
-                    <div id="plan-container" class="space-y-6 text-center text-slate-300 italic py-10">Initializing system...</div>
+                    <div id="plan-container" class="space-y-6">
+                        <p class="text-center text-slate-400 italic py-10">Initializing Plan...</p>
+                    </div>
                 </section>
             </div>
         </div>
     </div>
 
     <script type="module">
-        console.log("System: Script Loading...");
-
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.7/firebase-app.js";
         import { getFirestore, doc, onSnapshot, setDoc, collection, query, where, arrayUnion } from "https://www.gstatic.com/firebasejs/9.6.7/firebase-firestore.js";
         import { getAuth, GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.6.7/firebase-auth.js";
@@ -106,42 +107,12 @@
         let activeUser = "mimi";
         let trainingPlanData = []; 
         let runLogData = {};
-        let stravaInboxData = [];
         let expandedWeeks = new Set();
 
         const currentWeekNum = Math.max(1, Math.min(12, Math.floor((new Date() - planStartDate) / (7 * 864e5)) + 1));
         expandedWeeks.add(currentWeekNum);
 
-        // --- GLOBAL FUNCTIONS (Attached to window immediately) ---
-        
-        window.switchProfile = (name) => {
-            console.log("System: Switching to", name);
-            activeUser = name;
-            document.getElementById('display-name').innerText = name.charAt(0).toUpperCase() + name.slice(1) + "'s Plan";
-            document.getElementById('btn-mimi').className = name === 'mimi' ? 'px-6 py-1.5 rounded-lg text-sm font-semibold bg-white shadow-sm text-teal-600' : 'px-6 py-1.5 rounded-lg text-sm font-semibold text-slate-500';
-            document.getElementById('btn-gregou').className = name === 'gregou' ? 'px-6 py-1.5 rounded-lg text-sm font-semibold bg-white shadow-sm text-teal-600' : 'px-6 py-1.5 rounded-lg text-sm font-semibold text-slate-500';
-            initSync();
-        };
-
-        window.handleSignIn = () => signInWithRedirect(auth, provider);
-        window.handleSignOut = () => signOut(auth);
-
-        window.toggleWeek = (num) => {
-            if (expandedWeeks.has(num)) expandedWeeks.delete(num);
-            else expandedWeeks.add(num);
-            window.renderPlan();
-        };
-
-        window.postComment = async (runId) => {
-            const input = document.getElementById(`input-${runId}`);
-            if (!input?.value || !auth.currentUser) return;
-            try {
-                await setDoc(doc(db, `users/${activeUser}`, "runLogs", runId), {
-                    comments: arrayUnion({ user: auth.currentUser.displayName.split(' ')[0], text: input.value, ts: Date.now() })
-                }, { merge: true });
-                input.value = '';
-            } catch (e) { console.error("Comment Error:", e); }
-        };
+        // --- ATTACHED TO WINDOW FOR HTML ACCESSIBILITY ---
 
         window.renderPlan = () => {
             const container = document.getElementById('plan-container');
@@ -156,9 +127,12 @@
                 
                 weekDiv.innerHTML = `
                     <div class="week-header p-5 flex justify-between items-center bg-white" onclick="window.toggleWeek(${week.week})">
-                        <div class="flex items-center space-x-3">
-                            <span class="font-black text-slate-300 uppercase text-[10px] tracking-widest">Week ${week.week}</span>
-                            ${week.week === currentWeekNum ? '<span class="bg-teal-500 text-white text-[8px] font-black px-2 py-0.5 rounded-full uppercase">Current</span>' : ''}
+                        <div class="flex items-center space-x-5">
+                            <div class="flex flex-col">
+                                <span class="font-black text-slate-300 uppercase text-[9px] tracking-widest leading-none">Week ${week.week}</span>
+                                <span class="text-lg font-black text-slate-900 mt-1">${week.totalKm || 0} <span class="text-slate-300 font-bold text-[10px] uppercase">KM Total</span></span>
+                            </div>
+                            ${week.week === currentWeekNum ? '<span class="bg-teal-500 text-white text-[8px] font-black px-2 py-1 rounded-md uppercase tracking-tighter">Current</span>' : ''}
                         </div>
                         <span class="text-[10px] font-black text-slate-400 uppercase">${isExpanded ? 'Collapse' : 'Expand'}</span>
                     </div>
@@ -178,7 +152,7 @@
                     const runId = `w${week.week}d${dIdx}`;
                     const log = runLogData[runId] || { status: 'pending', comments: [] };
                     const tr = document.createElement('tr');
-                    tr.className = `border-b border-slate-50 ${isRest ? 'rest-day-row' : ''} ${week.week === currentWeekNum ? 'today-run-highlight' : ''}`;
+                    tr.className = `border-b border-slate-50 ${isRest ? 'rest-day-row' : ''}`;
                     
                     tr.innerHTML = `
                         <td class="p-6 w-24 align-top">
@@ -187,13 +161,13 @@
                         </td>
                         <td class="p-6 align-top">
                             <div class="flex flex-col">
-                                <span class="text-base font-bold text-slate-800 ${log.status==='completed'?'line-through opacity-40':''}">${workout}</span>
+                                <span class="text-base font-bold text-slate-800">${workout}</span>
                                 <p class="text-xs text-slate-500 mt-1 font-medium">${week[day+'_Detail'] || ''}</p>
                                 ${!isRest ? `
                                     <div class="mt-4 space-y-2">
                                         <div class="space-y-1.5">${(log.comments || []).map(c => `<div class="comment-item text-[11px] bg-slate-50 p-2.5 rounded-xl border border-slate-100"><span class="font-black text-teal-600 uppercase text-[9px] mr-1">${c.user}:</span><span class="text-slate-600 font-medium">${c.text}</span></div>`).join('')}</div>
                                         <div class="flex mt-3 shadow-sm rounded-xl overflow-hidden border border-slate-100">
-                                            <input type="text" id="input-${runId}" placeholder="Leave a note..." class="bg-white border-none text-[11px] px-4 py-2 w-full focus:ring-0">
+                                            <input type="text" id="input-${runId}" placeholder="Note..." class="bg-white border-none text-[11px] px-4 py-2 w-full focus:ring-0">
                                             <button onclick="window.postComment('${runId}')" class="bg-slate-900 text-white px-4 text-[10px] font-black uppercase tracking-widest">Post</button>
                                         </div>
                                     </div>` : ''}
@@ -209,62 +183,66 @@
             });
         };
 
-        // --- INTERNAL SYNC ---
-        let unsubPlan, unsubLogs, unsubInbox;
-        
-        function initSync() {
-            console.log("System: Initializing Sync for", activeUser);
-            if (unsubPlan) unsubPlan(); if (unsubLogs) unsubLogs(); if (unsubInbox) unsubInbox();
+        window.switchProfile = (name) => {
+            activeUser = name;
+            document.getElementById('display-name').innerText = name.charAt(0).toUpperCase() + name.slice(1) + "'s Plan";
+            document.getElementById('btn-mimi').className = name === 'mimi' ? 'px-6 py-1.5 rounded-lg text-sm font-semibold bg-white shadow-sm text-teal-600' : 'px-6 py-1.5 rounded-lg text-sm font-semibold text-slate-500';
+            document.getElementById('btn-gregou').className = name === 'gregou' ? 'px-6 py-1.5 rounded-lg text-sm font-semibold bg-white shadow-sm text-teal-600' : 'px-6 py-1.5 rounded-lg text-sm font-semibold text-slate-500';
+            initSync();
+        };
 
-            unsubPlan = onSnapshot(collection(db, `users/${activeUser}`, "planData"), (snap) => {
+        window.toggleWeek = (num) => {
+            if (expandedWeeks.has(num)) expandedWeeks.delete(num);
+            else expandedWeeks.add(num);
+            window.renderPlan();
+        };
+
+        window.postComment = async (runId) => {
+            const input = document.getElementById(`input-${runId}`);
+            if (!input?.value || !auth.currentUser) return;
+            await setDoc(doc(db, `users/${activeUser}`, "runLogs", runId), {
+                comments: arrayUnion({ user: auth.currentUser.displayName.split(' ')[0], text: input.value, ts: Date.now() })
+            }, { merge: true });
+            input.value = '';
+        };
+
+        window.handleSignIn = () => signInWithRedirect(auth, provider);
+        window.handleSignOut = () => signOut(auth);
+
+        // --- INTERNAL LOGIC ---
+
+        function initSync() {
+            onSnapshot(collection(db, `users/${activeUser}`, "planData"), (snap) => {
                 trainingPlanData = [];
                 snap.forEach(d => trainingPlanData.push({ week: parseInt(d.id.replace('week','')), ...d.data() }));
                 trainingPlanData.sort((a, b) => a.week - b.week);
                 window.renderPlan();
             });
-
-            unsubLogs = onSnapshot(collection(db, `users/${activeUser}`, "runLogs"), (snap) => {
+            onSnapshot(collection(db, `users/${activeUser}`, "runLogs"), (snap) => {
                 runLogData = {};
                 snap.forEach(d => runLogData[d.id] = d.data());
                 window.renderPlan();
             });
-
-            unsubInbox = onSnapshot(query(collection(db, `users/${activeUser}`, "stravaInbox"), where("status", "==", "pending")), (snap) => {
-                const container = document.getElementById('strava-inbox');
-                container.innerHTML = snap.empty ? '<p class="text-[10px] text-slate-300 italic text-center">No runs in inbox.</p>' : '';
-                snap.forEach(runDoc => {
-                    const run = runDoc.data();
-                    const div = document.createElement('div');
-                    div.className = 'bg-slate-50 p-4 rounded-2xl border border-slate-100';
-                    div.innerHTML = `<p class="text-sm font-black text-slate-800">${run.distance}km @ ${run.date}</p><button class="w-full mt-2 bg-white border border-slate-200 text-[9px] font-black py-2 rounded-xl uppercase hover:bg-teal-600 hover:text-white transition-all">Match</button>`;
-                    container.appendChild(div);
-                });
-            });
         }
 
-        // --- STARTUP ---
         onAuthStateChanged(auth, (user) => {
             if (user) {
-                console.log("System: User Logged In", user.displayName);
                 document.getElementById('user-name').innerText = user.displayName;
                 document.getElementById('user-info').classList.remove('hidden');
                 document.getElementById('google-signin-btn').classList.add('hidden');
                 initSync();
             } else {
-                console.log("System: No User");
                 document.getElementById('user-info').classList.add('hidden');
                 document.getElementById('google-signin-btn').classList.remove('hidden');
             }
         });
 
-        getRedirectResult(auth).then(() => console.log("System: Auth Redirect Handled")).catch(e => console.error("Auth Error:", e));
+        getRedirectResult(auth).catch(e => console.error(e));
 
         setInterval(() => {
             const diff = raceDate - new Date();
             document.getElementById('countdown').innerText = Math.max(0, Math.floor(diff / 864e5));
         }, 1000);
-
-        console.log("System: Script Loaded Successfully.");
     </script>
 </body>
 </html>
