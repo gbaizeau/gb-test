@@ -5,39 +5,34 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Melbourne 2026 Hub</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏃</text></svg>">
-    
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; letter-spacing: -0.01em; }
-        
-        /* Color Coding */
-        .matched-row { background-color: #ecfdf5 !important; border-left: 4px solid #10b981 !important; } /* Emerald/Green */
-        .pending-row { background-color: #f0f9ff !important; border-left: 4px solid #0ea5e9 !important; } /* Sky/Blue */
-        
+        .matched-row { background-color: #ecfdf5 !important; border-left: 4px solid #10b981 !important; }
+        .pending-row { background-color: #f0f9ff !important; border-left: 4px solid #0ea5e9 !important; }
         .week-header { cursor: pointer; transition: all 0.2s; }
         .rest-day-row { opacity: 0.25; filter: grayscale(1); background-color: #f8fafc; }
         .comment-item { animation: fadeIn 0.3s ease; border-left: 2px solid #2dd4bf; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-        
-        #match-modal { transition: opacity 0.3s ease; }
-        .modal-card { transform: scale(0.95); transition: transform 0.3s ease; }
         #match-modal.active { display: flex !important; opacity: 1; }
-        #match-modal.active .modal-card { transform: scale(1); }
-
-        /* Progress Map */
         .map-track { position: relative; width: 100%; height: 80px; background: #f1f5f9; border-radius: 40px; border: 2px solid #e2e8f0; margin: 20px 0; }
         .avatar-marker { position: absolute; transition: all 1s cubic-bezier(0.34, 1.56, 0.64, 1); filter: drop-shadow(0 4px 6px rgba(0,0,0,0.1)); z-index: 10; }
         #marker-mimi { top: -22px; } 
         #marker-gregou { bottom: -22px; }
         .avatar-bubble { background: white; border-radius: 50%; padding: 4px; border: 3px solid; width: 46px; height: 46px; display: flex; align-items: center; justify-content: center; font-size: 22px; }
+        .switch { position: relative; display: inline-block; width: 34px; height: 20px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #e2e8f0; transition: .4s; border-radius: 20px; }
+        .slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: #14b8a6; }
+        input:checked + .slider:before { transform: translateX(14px); }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-900">
 
     <div id="match-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] hidden flex-col items-center justify-center p-4 opacity-0 transition-opacity">
-        <div class="modal-card bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden p-8">
+        <div class="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden p-8">
             <h3 class="text-2xl font-black tracking-tighter text-slate-900 mb-2">Select Activity</h3>
             <p id="modal-workout-info" class="text-xs font-bold text-sky-600 uppercase tracking-widest mb-6"></p>
             <div id="modal-run-list" class="space-y-3 max-h-[40vh] overflow-y-auto mb-8 pr-2"></div>
@@ -49,16 +44,16 @@
         <div class="flex items-center space-x-6">
             <h1 class="text-xl font-black tracking-tighter text-teal-600">MELB '26</h1>
             <div class="flex bg-slate-100 p-1 rounded-xl">
-                <button onclick="switchProfile('mimi')" id="btn-mimi" class="px-6 py-1.5 rounded-lg text-sm font-semibold transition-all bg-white shadow-sm text-teal-600">Mimi</button>
-                <button onclick="switchProfile('gregou')" id="btn-gregou" class="px-6 py-1.5 rounded-lg text-sm font-semibold transition-all text-slate-500">Gregou</button>
+                <button onclick="window.switchProfile('mimi')" id="btn-mimi" class="px-6 py-1.5 rounded-lg text-sm font-semibold transition-all bg-white shadow-sm text-teal-600">Mimi</button>
+                <button onclick="window.switchProfile('gregou')" id="btn-gregou" class="px-6 py-1.5 rounded-lg text-sm font-semibold transition-all text-slate-500">Gregou</button>
             </div>
         </div>
         <div id="auth-container" class="flex items-center space-x-4">
             <div id="user-info" class="hidden flex items-center space-x-3">
                 <span id="user-name" class="text-sm font-bold text-slate-700"></span>
-                <button id="signout-btn" onclick="handleSignOut()" class="text-[10px] bg-slate-100 px-2 py-1 rounded-md text-slate-400 font-bold uppercase">Sign Out</button>
+                <button onclick="window.handleSignOut()" class="text-[10px] bg-slate-100 px-2 py-1 rounded-md text-slate-400 font-bold uppercase hover:bg-red-50 hover:text-red-500 transition-all">Sign Out</button>
             </div>
-            <button id="google-signin-btn" onclick="handleSignIn()" class="bg-blue-600 text-white px-5 py-2 rounded-xl text-sm font-bold shadow-lg">Sign in</button>
+            <button id="google-signin-btn" onclick="window.handleSignIn()" class="bg-blue-600 text-white px-5 py-2 rounded-xl text-sm font-bold shadow-lg">Sign in</button>
         </div>
     </nav>
 
@@ -69,7 +64,6 @@
                     <div id="countdown" class="text-6xl font-black text-teal-600 tracking-tighter">--</div>
                     <p class="text-[10px] text-slate-400 font-black uppercase mt-2 tracking-widest text-center">Days to Melbourne</p>
                 </section>
-                
                 <section class="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
                     <h2 class="text-xs font-black text-slate-400 uppercase mb-4 tracking-widest text-center">Activity Inbox</h2>
                     <div id="strava-inbox" class="space-y-3"></div>
@@ -77,5 +71,257 @@
             </aside>
 
             <div class="lg:col-span-2 space-y-6">
-                <section class="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-100">
-                    <h2 class="text-xs font-black text-slate-400 uppercase mb-12 tracking-widest text-
+                <section class="bg-white p-8 md:p-12 rounded-[2rem] shadow-sm border border-slate-100">
+                    <h2 class="text-xs font-black text-slate-400 uppercase mb-12 tracking-widest text-center tracking-[0.2em]">The Road to Melbourne</h2>
+                    <div class="map-track">
+                        <div class="absolute right-0 h-full w-2 bg-teal-500/20 border-r-4 border-teal-500 border-dashed"></div>
+                        <div id="marker-mimi" class="avatar-marker" style="left: 0%;"><div class="avatar-bubble border-pink-400 text-pink-500">👸</div></div>
+                        <div id="marker-gregou" class="avatar-marker" style="left: 0%;"><div class="avatar-bubble border-blue-500 text-blue-600">🚴‍♂️</div></div>
+                    </div>
+                </section>
+
+                <section class="bg-white p-4 md:p-8 rounded-[2rem] shadow-sm border border-slate-100">
+                    <div class="mb-8 flex justify-between items-center px-4">
+                        <h2 class="text-4xl font-black text-slate-900 tracking-tighter" id="display-name">Mimi's Plan</h2>
+                        <div class="flex items-center space-x-3 bg-slate-50 px-4 py-2 rounded-2xl border border-slate-100">
+                            <span class="text-[10px] font-black text-slate-400 uppercase">Hide Rest</span>
+                            <label class="switch"><input type="checkbox" id="hide-rest-toggle" checked onchange="window.renderPlan()"><span class="slider"></span></label>
+                        </div>
+                    </div>
+                    <div id="plan-container" class="space-y-6"></div>
+                </section>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.7/firebase-app.js";
+        import { getFirestore, doc, onSnapshot, setDoc, collection, query, where, arrayUnion, getDocs, deleteDoc, getDoc } from "https://www.gstatic.com/firebasejs/9.6.7/firebase-firestore.js";
+        import { getAuth, GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.6.7/firebase-auth.js";
+
+        console.log("System: Booting Master v6.1...");
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyAscCQCTKwszBKcHlaJB5Zgm0X_dOUPw5Y",
+            authDomain: "melbmara2026.firebaseapp.com",
+            projectId: "melbmara2026",
+            storageBucket: "melbmara2026.firebasestorage.app",
+            messagingSenderId: "968047511570",
+            appId: "1:968047511570:web:367e6129673359b61430cb"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        const provider = new GoogleAuthProvider();
+
+        const planStartDate = new Date("2026-07-20T00:00:00");
+        const raceDate = new Date("2026-10-11T08:00:00");
+
+        let activeUser = "mimi";
+        let trainingPlanData = []; 
+        let runLogData = {};
+        let stravaInboxData = [];
+        let expandedWeeks = new Set();
+        let unsubs = [];
+
+        const currentWeekNum = Math.max(1, Math.min(12, Math.floor((new Date() - planStartDate) / (7 * 864e5)) + 1));
+        expandedWeeks.add(currentWeekNum);
+
+        // --- GLOBAL ATTACHMENTS (IMMEDIATE) ---
+
+        window.handleSignIn = () => signInWithRedirect(auth, provider);
+        window.handleSignOut = () => signOut(auth);
+
+        window.switchProfile = (name) => {
+            activeUser = name;
+            document.getElementById('display-name').innerText = name.charAt(0).toUpperCase() + name.slice(1) + "'s Plan";
+            document.getElementById('btn-mimi').className = name === 'mimi' ? 'px-6 py-1.5 rounded-lg text-sm font-semibold bg-white shadow-sm text-teal-600' : 'px-6 py-1.5 rounded-lg text-sm font-semibold text-slate-500';
+            document.getElementById('btn-gregou').className = name === 'gregou' ? 'px-6 py-1.5 rounded-lg text-sm font-semibold bg-white shadow-sm text-teal-600' : 'px-6 py-1.5 rounded-lg text-sm font-semibold text-slate-500';
+            initSync();
+        };
+
+        window.toggleWeek = (num) => {
+            if (expandedWeeks.has(num)) expandedWeeks.delete(num);
+            else expandedWeeks.add(num);
+            window.renderPlan();
+        };
+
+        window.renderPlan = () => {
+            const container = document.getElementById('plan-container');
+            if (!container) return;
+            const hideRest = document.getElementById('hide-rest-toggle')?.checked || false;
+            container.innerHTML = '';
+
+            trainingPlanData.forEach((week) => {
+                const isExpanded = expandedWeeks.has(week.week);
+                const weekDiv = document.createElement('div');
+                weekDiv.className = `week-container rounded-[1.5rem] border border-slate-100 overflow-hidden transition-all ${isExpanded ? 'bg-white shadow-md' : 'bg-slate-50 opacity-60'}`;
+                
+                weekDiv.innerHTML = `
+                    <div class="week-header p-5 flex justify-between items-center bg-white" onclick="window.toggleWeek(${week.week})">
+                        <div class="flex items-center space-x-5">
+                            <div class="flex flex-col">
+                                <span class="font-black text-slate-300 uppercase text-[9px] tracking-widest leading-none">Week ${week.week}</span>
+                                <span class="text-lg font-black text-slate-900 mt-1">${week.totalKm || 0} <span class="text-slate-300 font-bold text-[10px] uppercase">KM</span></span>
+                            </div>
+                            ${week.week === currentWeekNum ? '<span class="bg-teal-500 text-white text-[8px] font-black px-2 py-1 rounded-md uppercase tracking-tighter">Current</span>' : ''}
+                        </div>
+                        <span class="text-[10px] font-black text-slate-400 uppercase">${isExpanded ? 'Collapse' : 'Expand'}</span>
+                    </div>
+                    <div class="week-content ${isExpanded ? '' : 'hidden'} border-t border-slate-50">
+                        <table class="w-full text-left text-sm"><tbody id="week-body-${week.week}"></tbody></table>
+                    </div>
+                `;
+                
+                const tbody = weekDiv.querySelector('tbody');
+                const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+                days.forEach((day, dIdx) => {
+                    const workout = week[day] || "Rest";
+                    const isRest = workout.toLowerCase() === 'rest';
+                    if (hideRest && isRest) return;
+
+                    const workoutDate = new Date(planStartDate.getTime() + ((week.week - 1) * 7 + dIdx) * 864e5);
+                    const runId = `w${week.week}d${dIdx}`;
+                    const log = runLogData[runId] || { status: 'pending', comments: [] };
+                    const isCompleted = log.status === 'completed';
+                    
+                    const tr = document.createElement('tr');
+                    tr.className = `border-b border-slate-50 ${isRest ? 'rest-day-row' : ''} ${isCompleted ? 'matched-row' : (isRest ? '' : 'pending-row')}`;
+                    
+                    tr.innerHTML = `
+                        <td class="p-6 w-24 align-top">
+                            <p class="text-[10px] font-black text-slate-300 uppercase leading-none">${day}</p>
+                            <p class="text-xs font-bold text-slate-600">${workoutDate.toLocaleDateString('en-AU', {day:'numeric', month:'short'})}</p>
+                        </td>
+                        <td class="p-6 align-top">
+                            <div class="flex flex-col">
+                                <span class="text-base font-bold text-slate-800">${workout}</span>
+                                <p class="text-xs text-slate-500 mt-1 font-medium">${week[day+'_Detail'] || ''}</p>
+                                ${!isRest ? `
+                                    <div class="mt-4 space-y-2">
+                                        <div class="space-y-1.5">${(log.comments || []).map(c => `<div class="comment-item text-[11px] bg-white/50 p-2.5 rounded-xl border border-slate-100"><span class="font-black text-teal-600 uppercase text-[9px] mr-1">${c.user}:</span><span class="text-slate-600 font-medium">${c.text}</span></div>`).join('')}</div>
+                                        <div class="flex mt-3 shadow-sm rounded-xl overflow-hidden border border-slate-100">
+                                            <input type="text" id="input-${runId}" placeholder="Note..." class="bg-white border-none text-[11px] px-4 py-2 w-full focus:ring-0">
+                                            <button onclick="window.postComment('${runId}')" class="bg-slate-900 text-white px-4 text-[10px] font-black uppercase tracking-widest">Post</button>
+                                        </div>
+                                    </div>` : ''}
+                            </div>
+                        </td>
+                        <td class="p-6 text-right align-top">
+                            ${!isRest ? (isCompleted ? 
+                                `<div><p class="text-[10px] font-black text-emerald-600 uppercase mb-2 leading-none">${log.actualDistance}km</p><button onclick="window.unmatchActivity('${runId}')" class="text-[10px] font-black text-slate-400 hover:text-red-500 uppercase tracking-tighter">Unmatch</button></div>` :
+                                `<button onclick="window.openMatchModal('${runId}', '${workout}', '${workoutDate.toISOString()}')" class="bg-white border border-slate-200 px-4 py-1.5 rounded-xl text-[10px] font-black text-sky-500 uppercase tracking-tighter hover:border-sky-500 transition-all">Match</button>`
+                            ) : ''}
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+                if (tbody.children.length > 0) container.appendChild(weekDiv);
+            });
+        };
+
+        window.renderInbox = () => {
+            const container = document.getElementById('strava-inbox');
+            if (!container) return;
+            container.innerHTML = stravaInboxData.length === 0 ? '<p class="text-[10px] text-slate-300 italic text-center">Inbox empty.</p>' : '';
+            stravaInboxData.forEach(run => {
+                const div = document.createElement('div');
+                div.className = 'bg-slate-50 p-4 rounded-2xl border border-slate-100 flex justify-between items-center group';
+                div.innerHTML = `<div><p class="text-xs font-black text-slate-800">${run.distance}km</p><p class="text-[9px] text-slate-400 font-bold uppercase">${run.date}</p></div>
+                    <button onclick="window.deleteInboxRun('${run.id}')" class="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-500 transition-all"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>`;
+                container.appendChild(div);
+            });
+        };
+
+        window.openMatchModal = (runId, workoutName, isoDate) => {
+            const modal = document.getElementById('match-modal');
+            const runList = document.getElementById('modal-run-list');
+            const targetDate = new Date(isoDate);
+            document.getElementById('modal-workout-info').innerText = `${workoutName} (${targetDate.toLocaleDateString('en-AU', {day:'numeric', month:'short'})})`;
+            const sortedRuns = [...stravaInboxData].sort((a, b) => Math.abs(new Date(a.date) - targetDate) - Math.abs(new Date(b.date) - targetDate));
+            runList.innerHTML = sortedRuns.map(run => `<button onclick="window.confirmMatch('${runId}', '${run.id}', '${workoutName}', ${run.distance}, '${run.date}')" class="w-full text-left p-4 rounded-2xl border border-slate-100 bg-slate-50 hover:border-sky-500 flex justify-between items-center"><div><p class="text-sm font-black text-slate-900">${run.distance}km</p><p class="text-[10px] font-bold text-slate-500 uppercase mt-0.5">${run.date}</p></div><span class="text-[9px] font-black text-sky-600 uppercase tracking-widest">Match</span></button>`).join('');
+            modal.classList.add('active');
+        };
+
+        window.closeMatchModal = () => document.getElementById('match-modal').classList.remove('active');
+
+        window.confirmMatch = async (runId, activityId, workoutName, actualDist, originalDate) => {
+            await setDoc(doc(db, `users/${activeUser}`, "runLogs", runId), { actualDistance: actualDist, status: "completed", originalDate: originalDate, activityId: activityId }, { merge: true });
+            await deleteDoc(doc(db, `users/${activeUser}/stravaInbox`, activityId));
+            window.closeMatchModal();
+        };
+
+        window.unmatchActivity = async (runId) => {
+            if (!confirm("Unmatch this run?")) return;
+            const logRef = doc(db, `users/${activeUser}`, "runLogs", runId);
+            const snap = await getDoc(logRef);
+            const data = snap.data();
+            await setDoc(doc(db, `users/${activeUser}/stravaInbox`, data.activityId || `unmatch_${Date.now()}`), { distance: data.actualDistance, date: data.originalDate || "Unknown", status: "pending" });
+            await setDoc(logRef, { actualDistance: null, status: "pending", activityId: null, originalDate: null }, { merge: true });
+        };
+
+        window.deleteInboxRun = async (activityId) => {
+            if (confirm("Delete permanently?")) await deleteDoc(doc(db, `users/${activeUser}/stravaInbox`, activityId));
+        };
+
+        window.postComment = async (runId) => {
+            const input = document.getElementById(`input-${runId}`);
+            if (!input?.value || !auth.currentUser) return;
+            await setDoc(doc(db, `users/${activeUser}`, "runLogs", runId), { comments: arrayUnion({ user: auth.currentUser.displayName.split(' ')[0], text: input.value, ts: Date.now() }) }, { merge: true });
+            input.value = '';
+        };
+
+        // --- DATA ENGINE ---
+
+        async function updateMap() {
+            const users = ["mimi", "gregou"];
+            for (const u of users) {
+                const planSnap = await getDocs(collection(db, `users/${u}/planData`));
+                const logSnap = await getDocs(collection(db, `users/${u}/runLogs`));
+                let goal = 0; planSnap.forEach(d => goal += parseFloat(d.data().totalKm || 0));
+                let done = 0; logSnap.forEach(d => { if (d.data().status === 'completed') done += parseFloat(d.data().actualDistance); });
+                const marker = document.getElementById(`marker-${u}`);
+                if (marker) marker.style.left = `${goal > 0 ? Math.min(98, (done/goal)*100) : 0}%`;
+            }
+        }
+
+        function initSync() {
+            unsubs.forEach(unsub => unsub()); unsubs = [];
+            unsubs.push(onSnapshot(collection(db, `users/${activeUser}`, "planData"), (snap) => {
+                trainingPlanData = []; snap.forEach(d => trainingPlanData.push({ week: parseInt(d.id.replace('week','')), ...d.data() }));
+                trainingPlanData.sort((a,b) => a.week - b.week); window.renderPlan(); updateMap();
+            }));
+            unsubs.push(onSnapshot(collection(db, `users/${activeUser}`, "runLogs"), (snap) => {
+                runLogData = {}; snap.forEach(d => runLogData[d.id] = d.data());
+                window.renderPlan(); updateMap();
+            }));
+            unsubs.push(onSnapshot(query(collection(db, `users/${activeUser}`, "stravaInbox"), where("status", "==", "pending")), (snap) => {
+                stravaInboxData = []; snap.forEach(d => stravaInboxData.push({ id: d.id, ...d.data() }));
+                window.renderInbox();
+            }));
+        }
+
+        onAuthStateChanged(auth, (user) => {
+            console.log("System: Auth State Change", user ? "User In" : "User Out");
+            if (user) {
+                document.getElementById('user-name').innerText = user.displayName;
+                document.getElementById('user-info').classList.remove('hidden');
+                document.getElementById('google-signin-btn').classList.add('hidden');
+                initSync();
+            } else {
+                document.getElementById('user-info').classList.add('hidden');
+                document.getElementById('google-signin-btn').classList.remove('hidden');
+            }
+        });
+
+        getRedirectResult(auth).catch(e => console.error("Auth Error:", e));
+        setInterval(() => {
+            const diff = raceDate - new Date();
+            const el = document.getElementById('countdown');
+            if (el) el.innerText = Math.max(0, Math.floor(diff / 864e5));
+        }, 1000);
+    </script>
+</body>
+</html>
