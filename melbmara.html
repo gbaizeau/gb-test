@@ -93,8 +93,8 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.7/firebase-app.js";
-        import { getFirestore, doc, onSnapshot, setDoc, collection, query, where, arrayUnion, getDocs, deleteDoc, getDoc } from "https://www.gstatic.com/firebasejs/9.6.7/firebase-firestore.js";
-        import { getAuth, GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.6.7/firebase-auth.js";
+        import { getFirestore, doc, onSnapshot, setDoc, collection, query, where, arrayUnion, getDocs, deleteDoc, getDoc } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
+        import { getAuth, GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyAscCQCTKwszBKcHlaJB5Zgm0X_dOUPw5Y",
@@ -123,7 +123,12 @@
         const currentWeekNum = Math.max(1, Math.min(12, Math.floor((new Date() - planStartDate) / (7 * 864e5)) + 1));
         expandedWeeks.add(currentWeekNum);
 
-        // --- ATTACHED GLOBALLY FOR ACCESSIBILITY ---
+        // --- NEW HELPER FOR NICE DATE FORMATTING ---
+        const formatNiceDate = (dateStr) => {
+            if (!dateStr) return "---";
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+        };
 
         window.handleSignIn = () => signInWithRedirect(auth, provider);
         window.handleSignOut = () => signOut(auth);
@@ -224,7 +229,7 @@
             stravaInboxData.forEach(run => {
                 const div = document.createElement('div');
                 div.className = 'bg-slate-50 p-4 rounded-2xl border border-slate-100 flex justify-between items-center group';
-                div.innerHTML = `<div><p class="text-xs font-black text-slate-800">${run.distance}km</p><p class="text-[9px] text-slate-400 font-bold uppercase">${run.date}</p></div>
+                div.innerHTML = `<div><p class="text-xs font-black text-slate-800">${run.distance}km</p><p class="text-[9px] text-slate-400 font-bold uppercase">${formatNiceDate(run.date)}</p></div>
                     <button onclick="window.deleteInboxRun('${run.id}')" class="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-500 transition-all"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>`;
                 container.appendChild(div);
             });
@@ -236,7 +241,7 @@
             const targetDate = new Date(isoDate);
             document.getElementById('modal-workout-info').innerText = `${workoutName} (${targetDate.toLocaleDateString('en-AU', {day:'numeric', month:'short'})})`;
             const sortedRuns = [...stravaInboxData].sort((a, b) => Math.abs(new Date(a.date) - targetDate) - Math.abs(new Date(b.date) - targetDate));
-            runList.innerHTML = sortedRuns.map(run => `<button onclick="window.confirmMatch('${runId}', '${run.id}', '${workoutName}', ${run.distance}, '${run.date}')" class="w-full text-left p-4 rounded-2xl border border-slate-100 bg-slate-50 hover:border-sky-500 flex justify-between items-center group"><div class="flex flex-col"><p class="text-sm font-black text-slate-900 group-hover:text-sky-600 transition-colors">${run.distance}km</p><p class="text-[10px] font-bold text-slate-400 uppercase mt-0.5">${run.date}</p></div><span class="text-[9px] font-black text-sky-600 uppercase tracking-widest opacity-0 group-hover:opacity-100">Match</span></button>`).join('');
+            runList.innerHTML = sortedRuns.map(run => `<button onclick="window.confirmMatch('${runId}', '${run.id}', '${workoutName}', ${run.distance}, '${run.date}')" class="w-full text-left p-4 rounded-2xl border border-slate-100 bg-slate-50 hover:border-sky-500 flex justify-between items-center group"><div class="flex flex-col"><p class="text-sm font-black text-slate-900 group-hover:text-sky-600 transition-colors">${run.distance}km</p><p class="text-[10px] font-bold text-slate-400 uppercase mt-0.5">${formatNiceDate(run.date)}</p></div><span class="text-[9px] font-black text-sky-600 uppercase tracking-widest opacity-0 group-hover:opacity-100">Match</span></button>`).join('');
             modal.classList.add('active');
         };
 
@@ -246,7 +251,7 @@
             await setDoc(doc(db, `users/${activeUser}`, "runLogs", runId), { 
                 actualDistance: actualDist, 
                 status: "completed", 
-                originalDate: runDate, // Save the specific date string
+                originalDate: runDate, 
                 activityId: activityId 
             }, { merge: true });
             await deleteDoc(doc(db, `users/${activeUser}/stravaInbox`, activityId));
