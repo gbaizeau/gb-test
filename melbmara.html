@@ -93,8 +93,8 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.7/firebase-app.js";
-        import { getFirestore, doc, onSnapshot, setDoc, collection, query, where, arrayUnion, getDocs, deleteDoc, getDoc } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
-        import { getAuth, GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
+        import { getFirestore, doc, onSnapshot, setDoc, collection, query, where, arrayUnion, getDocs, deleteDoc, getDoc } from "https://www.gstatic.com/firebasejs/9.6.7/firebase-firestore.js";
+        import { getAuth, GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.6.7/firebase-auth.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyAscCQCTKwszBKcHlaJB5Zgm0X_dOUPw5Y",
@@ -123,10 +123,11 @@
         const currentWeekNum = Math.max(1, Math.min(12, Math.floor((new Date() - planStartDate) / (7 * 864e5)) + 1));
         expandedWeeks.add(currentWeekNum);
 
-        // --- NEW HELPER FOR NICE DATE FORMATTING ---
+        // --- SAFE NICE DATE FORMATTER ---
         const formatNiceDate = (dateStr) => {
-            if (!dateStr) return "---";
+            if (!dateStr || dateStr.includes('X')) return dateStr || "---";
             const date = new Date(dateStr);
+            if (isNaN(date)) return dateStr;
             return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
         };
 
