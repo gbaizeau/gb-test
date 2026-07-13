@@ -88,7 +88,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.7/firebase-app.js";
         import { getFirestore, doc, onSnapshot, setDoc, collection, arrayUnion, getDocs } from "https://www.gstatic.com/firebasejs/9.6.7/firebase-firestore.js";
-        import { getAuth, GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.6.7/firebase-auth.js";
+        import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.6.7/firebase-auth.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyAscCQCTKwszBKcHlaJB5Zgm0X_dOUPw5Y",
@@ -116,7 +116,14 @@
         const currentWeekNum = Math.max(1, Math.min(12, Math.floor((new Date() - planStartDate) / (7 * 864e5)) + 1));
         expandedWeeks.add(currentWeekNum);
 
-        window.handleSignIn = () => signInWithRedirect(auth, provider);
+        window.handleSignIn = async () => {
+            try {
+                await signInWithPopup(auth, provider);
+            } catch (e) {
+                console.error(e);
+                alert("Sign-in failed: " + e.message);
+            }
+        };
         window.handleSignOut = () => signOut(auth);
 
         window.switchProfile = (name) => {
@@ -301,7 +308,7 @@
             }
         });
 
-        getRedirectResult(auth).catch(e => console.error(e));
+
         setInterval(() => {
             const diff = raceDate - new Date();
             const el = document.getElementById('countdown');
