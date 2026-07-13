@@ -13,7 +13,6 @@
         .pending-row { background-color: #f0f9ff !important; border-left: 4px solid #0ea5e9 !important; }
         .rest-day-row { opacity: 0.25; filter: grayscale(1); background-color: #f8fafc; }
         .week-header { cursor: pointer; transition: all 0.2s; }
-        #match-modal.active { display: flex !important; opacity: 1; }
         .map-track { position: relative; width: 100%; height: 80px; background: #f1f5f9; border-radius: 40px; border: 2px solid #e2e8f0; margin: 20px 0; }
         .avatar-marker { position: absolute; transition: all 1s cubic-bezier(0.34, 1.56, 0.64, 1); filter: drop-shadow(0 4px 6px rgba(0,0,0,0.1)); z-index: 10; }
         #marker-mimi { top: -22px; } #marker-gregou { bottom: -22px; }
@@ -27,15 +26,6 @@
     </style>
 </head>
 <body class="bg-slate-50 text-slate-900">
-
-    <div id="match-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] hidden flex-col items-center justify-center p-4 opacity-0 transition-opacity">
-        <div class="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden p-8">
-            <h3 class="text-2xl font-black tracking-tighter text-slate-900 mb-2 text-center">Select Activity</h3>
-            <p id="modal-workout-info" class="text-[10px] font-black text-sky-500 uppercase tracking-widest mb-6 text-center"></p>
-            <div id="modal-run-list" class="space-y-3 max-h-[40vh] overflow-y-auto mb-8 pr-2"></div>
-            <button onclick="window.closeMatchModal()" class="w-full bg-slate-100 text-slate-400 py-4 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-slate-200 transition-all">Cancel</button>
-        </div>
-    </div>
 
     <nav class="fixed top-0 w-full bg-white/90 backdrop-blur-md border-b border-slate-200 z-50 px-6 py-3 flex justify-between items-center">
         <div class="flex items-center space-x-6">
@@ -61,9 +51,13 @@
                     <div id="countdown" class="text-6xl font-black text-teal-600 tracking-tighter">--</div>
                     <p class="text-[10px] text-slate-400 font-black uppercase mt-2 tracking-widest text-center">Days to Melbourne</p>
                 </section>
-                <section class="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
-                    <h2 class="text-xs font-black text-slate-400 uppercase mb-4 tracking-widest text-center">Activity Inbox</h2>
-                    <div id="strava-inbox" class="space-y-3"></div>
+                <section class="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100 text-center">
+                    <h2 class="text-[10px] font-black text-slate-400 uppercase mb-3 tracking-widest">Logged So Far</h2>
+                    <div id="progress-stat" class="text-3xl font-black text-teal-600 tracking-tighter">--</div>
+                    <div id="progress-bar-track" class="w-full h-2 bg-slate-100 rounded-full mt-4 overflow-hidden">
+                        <div id="progress-bar-fill" class="h-full bg-teal-500 rounded-full transition-all" style="width:0%"></div>
+                    </div>
+                    <p id="progress-fun-msg" class="text-[10px] text-slate-400 font-bold uppercase mt-3 tracking-widest"></p>
                 </section>
             </aside>
 
@@ -93,7 +87,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.7/firebase-app.js";
-        import { getFirestore, doc, onSnapshot, setDoc, collection, query, where, arrayUnion, getDocs, deleteDoc, getDoc } from "https://www.gstatic.com/firebasejs/9.6.7/firebase-firestore.js";
+        import { getFirestore, doc, onSnapshot, setDoc, collection, arrayUnion, getDocs } from "https://www.gstatic.com/firebasejs/9.6.7/firebase-firestore.js";
         import { getAuth, GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.6.7/firebase-auth.js";
 
         const firebaseConfig = {
@@ -116,20 +110,11 @@
         let activeUser = "mimi";
         let trainingPlanData = []; 
         let runLogData = {};
-        let stravaInboxData = [];
         let expandedWeeks = new Set();
         let unsubs = [];
 
         const currentWeekNum = Math.max(1, Math.min(12, Math.floor((new Date() - planStartDate) / (7 * 864e5)) + 1));
         expandedWeeks.add(currentWeekNum);
-
-        // --- SAFE NICE DATE FORMATTER ---
-        const formatNiceDate = (dateStr) => {
-            if (!dateStr || dateStr.includes('X')) return dateStr || "---";
-            const date = new Date(dateStr);
-            if (isNaN(date)) return dateStr;
-            return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-        };
 
         window.handleSignIn = () => signInWithRedirect(auth, provider);
         window.handleSignOut = () => signOut(auth);
@@ -212,8 +197,13 @@
                         </td>
                         <td class="p-6 text-right align-top">
                             ${!isRest ? (isCompleted ? 
-                                `<div><p class="text-[10px] font-black text-emerald-600 uppercase mb-2 leading-none">${log.actualDistance}km Logged</p><button onclick="window.unmatchActivity('${runId}')" class="text-[10px] font-black text-slate-400 hover:text-red-500 uppercase tracking-tighter">Unmatch</button></div>` :
-                                `<button onclick="window.openMatchModal('${runId}', '${workout}', '${workoutDate.toISOString()}')" class="bg-white border border-slate-200 px-4 py-1.5 rounded-xl text-[10px] font-black text-sky-500 uppercase tracking-tighter hover:border-sky-500 transition-all">Match</button>`
+                                `<div><p class="text-[10px] font-black text-emerald-600 uppercase mb-2 leading-none">✅ ${log.actualDistance ?? '?'}km</p>
+                                    <div class="flex justify-end space-x-3">
+                                        <button onclick="window.editDistance('${runId}')" class="text-[10px] font-black text-slate-400 hover:text-teal-600 uppercase tracking-tighter">Edit</button>
+                                        <button onclick="window.markUndone('${runId}')" class="text-[10px] font-black text-slate-400 hover:text-red-500 uppercase tracking-tighter">Undo</button>
+                                    </div>
+                                </div>` :
+                                `<button onclick="window.markDone('${runId}', '${workout.replace(/'/g, "\\'")}')" class="bg-teal-50 border border-teal-200 px-4 py-1.5 rounded-xl text-[10px] font-black text-teal-600 uppercase tracking-tighter hover:bg-teal-500 hover:text-white hover:border-teal-500 transition-all">Done ✓</button>`
                             ) : ''}
                         </td>
                     `;
@@ -223,57 +213,47 @@
             });
         };
 
-        window.renderInbox = () => {
-            const container = document.getElementById('strava-inbox');
-            if (!container) return;
-            container.innerHTML = stravaInboxData.length === 0 ? '<p class="text-[10px] text-slate-300 italic text-center">Inbox empty.</p>' : '';
-            stravaInboxData.forEach(run => {
-                const div = document.createElement('div');
-                div.className = 'bg-slate-50 p-4 rounded-2xl border border-slate-100 flex justify-between items-center group';
-                div.innerHTML = `<div><p class="text-xs font-black text-slate-800">${run.distance}km</p><p class="text-[9px] text-slate-400 font-bold uppercase">${formatNiceDate(run.date)}</p></div>
-                    <button onclick="window.deleteInboxRun('${run.id}')" class="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-500 transition-all"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>`;
-                container.appendChild(div);
-            });
+        // Parses the leading "Nk" distance out of a workout label, e.g. "12k Intervals" -> 12
+        const parsePlannedKm = (workoutLabel) => {
+            const m = workoutLabel.match(/(\d+(\.\d+)?)\s*k\b/i);
+            return m ? parseFloat(m[1]) : null;
         };
 
-        window.openMatchModal = (runId, workoutName, isoDate) => {
-            const modal = document.getElementById('match-modal');
-            const runList = document.getElementById('modal-run-list');
-            const targetDate = new Date(isoDate);
-            document.getElementById('modal-workout-info').innerText = `${workoutName} (${targetDate.toLocaleDateString('en-AU', {day:'numeric', month:'short'})})`;
-            const sortedRuns = [...stravaInboxData].sort((a, b) => Math.abs(new Date(a.date) - targetDate) - Math.abs(new Date(b.date) - targetDate));
-            runList.innerHTML = sortedRuns.map(run => `<button onclick="window.confirmMatch('${runId}', '${run.id}', '${workoutName}', ${run.distance}, '${run.date}')" class="w-full text-left p-4 rounded-2xl border border-slate-100 bg-slate-50 hover:border-sky-500 flex justify-between items-center group"><div class="flex flex-col"><p class="text-sm font-black text-slate-900 group-hover:text-sky-600 transition-colors">${run.distance}km</p><p class="text-[10px] font-bold text-slate-400 uppercase mt-0.5">${formatNiceDate(run.date)}</p></div><span class="text-[9px] font-black text-sky-600 uppercase tracking-widest opacity-0 group-hover:opacity-100">Match</span></button>`).join('');
-            modal.classList.add('active');
-        };
-
-        window.closeMatchModal = () => document.getElementById('match-modal').classList.remove('active');
-
-        window.confirmMatch = async (runId, activityId, workoutName, actualDist, runDate) => {
-            await setDoc(doc(db, `users/${activeUser}`, "runLogs", runId), { 
-                actualDistance: actualDist, 
-                status: "completed", 
-                originalDate: runDate, 
-                activityId: activityId 
+        window.markDone = async (runId, workoutLabel) => {
+            const planned = parsePlannedKm(workoutLabel);
+            await setDoc(doc(db, `users/${activeUser}`, "runLogs", runId), {
+                actualDistance: planned,
+                status: "completed"
             }, { merge: true });
-            await deleteDoc(doc(db, `users/${activeUser}/stravaInbox`, activityId));
-            window.closeMatchModal();
         };
 
-        window.unmatchActivity = async (runId) => {
-            if (!confirm("Unmatch this run?")) return;
-            const logRef = doc(db, `users/${activeUser}`, "runLogs", runId);
-            const snap = await getDoc(logRef);
-            const data = snap.data();
-            await setDoc(doc(db, `users/${activeUser}/stravaInbox`, data.activityId || `unmatch_${Date.now()}`), { 
-                distance: data.actualDistance, 
-                date: data.originalDate || "2026-XX-XX", 
-                status: "pending" 
-            });
-            await setDoc(logRef, { actualDistance: null, status: "pending", activityId: null, originalDate: null }, { merge: true });
+        window.editDistance = async (runId) => {
+            const current = runLogData[runId]?.actualDistance ?? '';
+            const input = prompt("Actual distance (km):", current);
+            if (input === null) return;
+            const val = parseFloat(input);
+            if (isNaN(val)) return;
+            await setDoc(doc(db, `users/${activeUser}`, "runLogs", runId), { actualDistance: val }, { merge: true });
         };
 
-        window.deleteInboxRun = async (activityId) => {
-            if (confirm("Delete permanently?")) await deleteDoc(doc(db, `users/${activeUser}/stravaInbox`, activityId));
+        window.markUndone = async (runId) => {
+            await setDoc(doc(db, `users/${activeUser}`, "runLogs", runId), { actualDistance: null, status: "pending" }, { merge: true });
+        };
+
+        window.renderProgressStat = () => {
+            const statEl = document.getElementById('progress-stat');
+            const fillEl = document.getElementById('progress-bar-fill');
+            const msgEl = document.getElementById('progress-fun-msg');
+            if (!statEl) return;
+            const goal = trainingPlanData.reduce((sum, w) => sum + parseFloat(w.totalKm || 0), 0);
+            const done = Object.values(runLogData).reduce((sum, log) => log.status === 'completed' ? sum + (parseFloat(log.actualDistance) || 0) : sum, 0);
+            const pct = goal > 0 ? Math.min(100, (done / goal) * 100) : 0;
+            statEl.innerText = `${Math.round(done)} / ${Math.round(goal)} km`;
+            if (fillEl) fillEl.style.width = `${pct}%`;
+            const messages = [[0, "Let's go! 🏁"], [25, "Warming up nicely 🔥"], [50, "Halfway hero 💪"], [75, "Home stretch! 🚀"], [95, "Almost there! 🎉"]];
+            let msg = messages[0][1];
+            messages.forEach(([threshold, text]) => { if (pct >= threshold) msg = text; });
+            if (msgEl) msgEl.innerText = msg;
         };
 
         window.postComment = async (runId) => {
@@ -301,15 +281,11 @@
             unsubs.forEach(unsub => unsub()); unsubs = [];
             unsubs.push(onSnapshot(collection(db, `users/${activeUser}`, "planData"), (snap) => {
                 trainingPlanData = []; snap.forEach(d => trainingPlanData.push({ week: parseInt(d.id.replace('week','')), ...d.data() }));
-                trainingPlanData.sort((a,b) => a.week - b.week); window.renderPlan(); updateMap();
+                trainingPlanData.sort((a,b) => a.week - b.week); window.renderPlan(); updateMap(); window.renderProgressStat();
             }));
             unsubs.push(onSnapshot(collection(db, `users/${activeUser}`, "runLogs"), (snap) => {
                 runLogData = {}; snap.forEach(d => runLogData[d.id] = d.data());
-                window.renderPlan(); updateMap();
-            }));
-            unsubs.push(onSnapshot(query(collection(db, `users/${activeUser}`, "stravaInbox"), where("status", "==", "pending")), (snap) => {
-                stravaInboxData = []; snap.forEach(d => stravaInboxData.push({ id: d.id, ...d.data() }));
-                window.renderInbox();
+                window.renderPlan(); updateMap(); window.renderProgressStat();
             }));
         }
 
