@@ -148,17 +148,22 @@
 
             trainingPlanData.forEach((week) => {
                 const isExpanded = expandedWeeks.has(week.week);
+                const isPast = week.week < currentWeekNum;
                 const weekDiv = document.createElement('div');
-                weekDiv.className = `week-container rounded-[1.5rem] border border-slate-100 overflow-hidden transition-all ${isExpanded ? 'bg-white shadow-md' : 'bg-slate-50 opacity-60'}`;
+                const stateClasses = isExpanded
+                    ? (isPast ? 'bg-emerald-50/40 shadow-md' : 'bg-white shadow-md')
+                    : (isPast ? 'bg-emerald-50/60 opacity-80' : 'bg-slate-50 opacity-60');
+                weekDiv.className = `week-container rounded-[1.5rem] border ${isPast ? 'border-emerald-100' : 'border-slate-100'} overflow-hidden transition-all ${stateClasses}`;
                 
                 weekDiv.innerHTML = `
-                    <div class="week-header p-5 flex justify-between items-center bg-white" onclick="window.toggleWeek(${week.week})">
+                    <div class="week-header p-5 flex justify-between items-center ${isPast ? 'bg-emerald-50/70' : 'bg-white'}" onclick="window.toggleWeek(${week.week})">
                         <div class="flex items-center space-x-5">
                             <div class="flex flex-col">
                                 <span class="font-black text-slate-300 uppercase text-[9px] tracking-widest leading-none">Week ${week.week}</span>
                                 <span class="text-lg font-black text-slate-900 mt-1">${week.totalKm || 0} <span class="text-slate-300 font-bold text-[10px] uppercase">KM</span></span>
                             </div>
                             ${week.week === currentWeekNum ? '<span class="bg-teal-500 text-white text-[8px] font-black px-2 py-1 rounded-md uppercase tracking-tighter">Current</span>' : ''}
+                            ${isPast ? '<span class="bg-emerald-100 text-emerald-600 text-[8px] font-black px-2 py-1 rounded-md uppercase tracking-tighter">✓ Done</span>' : ''}
                         </div>
                         <span class="text-[10px] font-black text-slate-400 uppercase">${isExpanded ? 'Collapse' : 'Expand'}</span>
                     </div>
@@ -278,7 +283,7 @@
                 const planSnap = await getDocs(collection(db, `users/${u}/planData`));
                 const logSnap = await getDocs(collection(db, `users/${u}/runLogs`));
                 let goal = 0; planSnap.forEach(d => goal += parseFloat(d.data().totalKm || 0));
-                let done = 0; logSnap.forEach(d => { if (d.data().status === 'completed') done += parseFloat(d.data().actualDistance); });
+                let done = 0; logSnap.forEach(d => { if (d.data().status === 'completed') done += (parseFloat(d.data().actualDistance) || 0); });
                 const marker = document.getElementById(`marker-${u}`);
                 if (marker) marker.style.left = `${goal > 0 ? Math.min(98, (done/goal)*100) : 0}%`;
             }
