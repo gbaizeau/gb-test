@@ -36,6 +36,21 @@
 </head>
 <body class="bg-slate-50 text-slate-900">
 
+    <div id="distance-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] hidden items-center justify-center p-4">
+        <div class="bg-white w-full max-w-sm rounded-[2.5rem] shadow-2xl p-8">
+            <h3 class="text-xl font-black tracking-tighter text-slate-900 mb-1 text-center">Actual Distance</h3>
+            <p id="distance-modal-workout" class="text-[10px] font-black text-sky-500 uppercase tracking-widest mb-8 text-center"></p>
+            <div class="flex items-center justify-center mb-8">
+                <input type="number" step="0.1" min="0" id="distance-input" inputmode="decimal" class="text-5xl font-black text-slate-900 text-center w-32 border-b-4 border-slate-200 focus:border-teal-500 outline-none pb-1 bg-transparent">
+                <span class="text-slate-300 font-black text-2xl ml-2">km</span>
+            </div>
+            <div class="flex space-x-3">
+                <button onclick="window.closeDistanceModal()" class="flex-1 bg-slate-100 text-slate-400 py-3.5 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-slate-200 transition-all">Cancel</button>
+                <button onclick="window.saveDistance()" class="flex-1 bg-slate-900 text-white py-3.5 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-slate-800 transition-all">Save</button>
+            </div>
+        </div>
+    </div>
+
     <div id="pain-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] hidden items-center justify-center p-4">
         <div class="bg-white w-full max-w-sm rounded-[2.5rem] shadow-2xl p-8">
             <h3 class="text-xl font-black tracking-tighter text-slate-900 mb-1 text-center">Pain Level</h3>
@@ -126,7 +141,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.7/firebase-app.js";
-        import { getFirestore, doc, onSnapshot, setDoc, collection, arrayUnion, getDocs } from "https://www.gstatic.com/firebasejs/9.6.7/firebase-firestore.js";
+        import { getFirestore, doc, onSnapshot, setDoc, collection, arrayUnion, arrayRemove, getDocs } from "https://www.gstatic.com/firebasejs/9.6.7/firebase-firestore.js";
         import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.6.7/firebase-auth.js";
 
         const firebaseConfig = {
@@ -241,7 +256,7 @@
                                 ${!isRest ? `
                                     <div class="mt-4 space-y-2">
                                         <div class="flex items-center justify-between">
-                                            <div class="space-y-1.5 flex-1">${(log.comments || []).map(c => `<div class="comment-item text-[11px] bg-white/50 p-2.5 rounded-xl border border-slate-100"><span class="font-black text-teal-600 uppercase text-[9px] mr-1">${c.user}:</span><span class="text-slate-600 font-medium">${c.text}</span></div>`).join('')}</div>
+                                            <div class="space-y-1.5 flex-1">${(log.comments || []).map((c, cIdx) => `<div class="comment-item text-[11px] bg-white/50 p-2.5 rounded-xl border border-slate-100 flex items-start justify-between gap-2"><span><span class="font-black text-teal-600 uppercase text-[9px] mr-1">${c.user}:</span><span class="text-slate-600 font-medium">${c.text}</span></span>${auth.currentUser && c.user === auth.currentUser.displayName.split(' ')[0] ? `<button onclick="window.deleteComment('${runId}', ${cIdx})" class="text-slate-300 hover:text-red-500 shrink-0 text-sm leading-none px-1">×</button>` : ''}</div>`).join('')}</div>
                                         </div>
                                         <button onclick="window.openPainModal('${runId}', '${workout.replace(/'/g, "\\'")}')" class="pain-badge inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-tighter ${log.painLevel != null ? window.painBadgeClass(log.painLevel) : 'bg-slate-50 text-slate-300 border border-slate-100'}">
                                             ${log.painLevel != null ? `🩹 Pain ${log.painLevel}/10` : '+ Log Pain'}
@@ -257,7 +272,7 @@
                             ${!isRest ? (isCompleted ? 
                                 `<div><p class="text-[10px] font-black text-emerald-600 uppercase mb-2 leading-none">✅ ${log.actualDistance ?? '?'}km</p>
                                     <div class="flex sm:justify-end space-x-3">
-                                        <button onclick="window.editDistance('${runId}')" class="text-[10px] font-black text-slate-400 hover:text-teal-600 uppercase tracking-tighter">Edit</button>
+                                        <button onclick="window.editDistance('${runId}', '${workout.replace(/'/g, "\\'")}')" class="text-[10px] font-black text-slate-400 hover:text-teal-600 uppercase tracking-tighter">Edit</button>
                                         <button onclick="window.markUndone('${runId}')" class="text-[10px] font-black text-slate-400 hover:text-red-500 uppercase tracking-tighter">Undo</button>
                                     </div>
                                 </div>` :
@@ -279,23 +294,59 @@
 
         window.markDone = async (runId, workoutLabel) => {
             const planned = parsePlannedKm(workoutLabel);
-            await setDoc(doc(db, `users/${activeUser}`, "runLogs", runId), {
-                actualDistance: planned,
-                status: "completed"
-            }, { merge: true });
+            try {
+                await setDoc(doc(db, `users/${activeUser}`, "runLogs", runId), {
+                    actualDistance: planned,
+                    status: "completed"
+                }, { merge: true });
+            } catch (e) {
+                console.error(e);
+                alert("Couldn't save - check your connection and try again.");
+            }
         };
 
-        window.editDistance = async (runId) => {
+        let currentDistanceRunId = null;
+
+        window.editDistance = (runId, workoutLabel) => {
+            currentDistanceRunId = runId;
             const current = runLogData[runId]?.actualDistance ?? '';
-            const input = prompt("Actual distance (km):", current);
-            if (input === null) return;
-            const val = parseFloat(input);
-            if (isNaN(val)) return;
-            await setDoc(doc(db, `users/${activeUser}`, "runLogs", runId), { actualDistance: val }, { merge: true });
+            document.getElementById('distance-modal-workout').innerText = workoutLabel || '';
+            const input = document.getElementById('distance-input');
+            input.value = current;
+            const modal = document.getElementById('distance-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            setTimeout(() => input.focus(), 50);
+        };
+
+        window.closeDistanceModal = () => {
+            const modal = document.getElementById('distance-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            currentDistanceRunId = null;
+        };
+
+        window.saveDistance = async () => {
+            if (!currentDistanceRunId) return;
+            const val = parseFloat(document.getElementById('distance-input').value);
+            if (isNaN(val)) { window.closeDistanceModal(); return; }
+            try {
+                await setDoc(doc(db, `users/${activeUser}`, "runLogs", currentDistanceRunId), { actualDistance: val }, { merge: true });
+            } catch (e) {
+                console.error(e);
+                alert("Couldn't save - check your connection and try again.");
+                return;
+            }
+            window.closeDistanceModal();
         };
 
         window.markUndone = async (runId) => {
-            await setDoc(doc(db, `users/${activeUser}`, "runLogs", runId), { actualDistance: null, status: "pending" }, { merge: true });
+            try {
+                await setDoc(doc(db, `users/${activeUser}`, "runLogs", runId), { actualDistance: null, status: "pending" }, { merge: true });
+            } catch (e) {
+                console.error(e);
+                alert("Couldn't save - check your connection and try again.");
+            }
         };
 
         // --- PAIN TRACKING ---
@@ -348,7 +399,13 @@
         window.savePainLevel = async () => {
             if (!currentPainRunId) return;
             const val = parseInt(document.getElementById('pain-slider').value, 10);
-            await setDoc(doc(db, `users/${activeUser}`, "runLogs", currentPainRunId), { painLevel: val }, { merge: true });
+            try {
+                await setDoc(doc(db, `users/${activeUser}`, "runLogs", currentPainRunId), { painLevel: val }, { merge: true });
+            } catch (e) {
+                console.error(e);
+                alert("Couldn't save - check your connection and try again.");
+                return;
+            }
             window.closePainModal();
         };
 
@@ -445,8 +502,26 @@
         window.postComment = async (runId) => {
             const input = document.getElementById(`input-${runId}`);
             if (!input?.value || !auth.currentUser) return;
-            await setDoc(doc(db, `users/${activeUser}`, "runLogs", runId), { comments: arrayUnion({ user: auth.currentUser.displayName.split(' ')[0], text: input.value, ts: Date.now() }) }, { merge: true });
-            input.value = '';
+            const text = input.value;
+            try {
+                await setDoc(doc(db, `users/${activeUser}`, "runLogs", runId), { comments: arrayUnion({ user: auth.currentUser.displayName.split(' ')[0], text, ts: Date.now() }) }, { merge: true });
+                input.value = '';
+            } catch (e) {
+                console.error(e);
+                alert("Couldn't save - check your connection and try again.");
+            }
+        };
+
+        window.deleteComment = async (runId, idx) => {
+            const log = runLogData[runId];
+            const comment = log?.comments?.[idx];
+            if (!comment) return;
+            try {
+                await setDoc(doc(db, `users/${activeUser}`, "runLogs", runId), { comments: arrayRemove(comment) }, { merge: true });
+            } catch (e) {
+                console.error(e);
+                alert("Couldn't delete - check your connection and try again.");
+            }
         };
 
         // --- CORE SYNC ENGINE ---
