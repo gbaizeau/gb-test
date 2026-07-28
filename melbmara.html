@@ -6,6 +6,7 @@
     <title>Melbourne 2026 Hub</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏃</text></svg>">
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; letter-spacing: -0.01em; }
@@ -23,9 +24,38 @@
         .slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
         input:checked + .slider { background-color: #14b8a6; }
         input:checked + .slider:before { transform: translateX(14px); }
+        #pain-slider { -webkit-appearance: none; appearance: none; width: 100%; height: 10px; border-radius: 10px;
+            background: linear-gradient(to right, #10b981 0%, #10b981 25%, #eab308 50%, #f97316 75%, #ef4444 100%); }
+        #pain-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 28px; height: 28px; background: white;
+            border: 4px solid #0f172a; border-radius: 50%; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.25); }
+        #pain-slider::-moz-range-thumb { width: 28px; height: 28px; background: white; border: 4px solid #0f172a;
+            border-radius: 50%; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.25); }
+        .pain-badge { transition: all 0.15s; }
+        .pain-badge:hover { transform: scale(1.05); }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-900">
+
+    <div id="pain-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] hidden items-center justify-center p-4">
+        <div class="bg-white w-full max-w-sm rounded-[2.5rem] shadow-2xl p-8">
+            <h3 class="text-xl font-black tracking-tighter text-slate-900 mb-1 text-center">Pain Level</h3>
+            <p id="pain-modal-workout" class="text-[10px] font-black text-sky-500 uppercase tracking-widest mb-8 text-center"></p>
+            <div class="text-center mb-2">
+                <span id="pain-value-display" class="text-6xl font-black tracking-tighter text-emerald-500">0</span>
+                <span class="text-slate-300 font-black text-xl">/10</span>
+            </div>
+            <p id="pain-value-label" class="text-center text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6">No Pain</p>
+            <input type="range" min="0" max="10" step="1" value="0" id="pain-slider" oninput="window.updatePainDisplay(this.value)">
+            <div class="flex justify-between text-[9px] font-black text-slate-300 uppercase mt-2 mb-8">
+                <span>No pain</span><span>Severe</span>
+            </div>
+            <div class="flex space-x-3">
+                <button onclick="window.closePainModal()" class="flex-1 bg-slate-100 text-slate-400 py-3.5 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-slate-200 transition-all">Cancel</button>
+                <button onclick="window.savePainLevel()" class="flex-1 bg-slate-900 text-white py-3.5 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-slate-800 transition-all">Save</button>
+            </div>
+        </div>
+    </div>
+
 
     <nav class="fixed top-0 w-full bg-white/90 backdrop-blur-md border-b border-slate-200 z-50 px-3 sm:px-6 py-3 flex justify-between items-center">
         <div class="flex items-center space-x-2 sm:space-x-6">
@@ -81,6 +111,15 @@
                     </div>
                     <div id="plan-container" class="space-y-6"></div>
                 </section>
+
+                <section class="bg-white p-5 sm:p-8 rounded-[2rem] shadow-sm border border-slate-100">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-xs font-black text-slate-400 uppercase tracking-widest">Pain Trend</h2>
+                        <span id="pain-trend-summary" class="text-[10px] font-black text-slate-400 uppercase tracking-widest"></span>
+                    </div>
+                    <div id="pain-chart-empty" class="text-center py-12 text-sm text-slate-300 font-bold">No pain logged yet - tap "Log Pain" on any run to start tracking.</div>
+                    <div style="height: 220px;"><canvas id="pain-chart"></canvas></div>
+                </section>
             </div>
         </div>
     </div>
@@ -112,6 +151,8 @@
         let runLogData = {};
         let expandedWeeks = new Set();
         let unsubs = [];
+        let painChart = null;
+        let currentPainRunId = null;
 
         const currentWeekNum = Math.max(1, Math.min(12, Math.floor((new Date() - planStartDate) / (7 * 864e5)) + 1));
         expandedWeeks.add(currentWeekNum);
@@ -199,7 +240,12 @@
                                 <p class="text-xs text-slate-500 mt-1 font-medium">${week[day+'_Detail'] || ''}</p>
                                 ${!isRest ? `
                                     <div class="mt-4 space-y-2">
-                                        <div class="space-y-1.5">${(log.comments || []).map(c => `<div class="comment-item text-[11px] bg-white/50 p-2.5 rounded-xl border border-slate-100"><span class="font-black text-teal-600 uppercase text-[9px] mr-1">${c.user}:</span><span class="text-slate-600 font-medium">${c.text}</span></div>`).join('')}</div>
+                                        <div class="flex items-center justify-between">
+                                            <div class="space-y-1.5 flex-1">${(log.comments || []).map(c => `<div class="comment-item text-[11px] bg-white/50 p-2.5 rounded-xl border border-slate-100"><span class="font-black text-teal-600 uppercase text-[9px] mr-1">${c.user}:</span><span class="text-slate-600 font-medium">${c.text}</span></div>`).join('')}</div>
+                                        </div>
+                                        <button onclick="window.openPainModal('${runId}', '${workout.replace(/'/g, "\\'")}')" class="pain-badge inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-tighter ${log.painLevel != null ? window.painBadgeClass(log.painLevel) : 'bg-slate-50 text-slate-300 border border-slate-100'}">
+                                            ${log.painLevel != null ? `🩹 Pain ${log.painLevel}/10` : '+ Log Pain'}
+                                        </button>
                                         <div class="flex mt-3 shadow-sm rounded-xl overflow-hidden border border-slate-100">
                                             <input type="text" id="input-${runId}" placeholder="Note..." class="bg-white border-none text-base sm:text-[13px] px-4 py-3 sm:py-2 w-full focus:ring-0 min-w-0">
                                             <button onclick="window.postComment('${runId}')" class="bg-slate-900 text-white px-4 text-[11px] font-black uppercase tracking-widest shrink-0">Post</button>
@@ -252,6 +298,134 @@
             await setDoc(doc(db, `users/${activeUser}`, "runLogs", runId), { actualDistance: null, status: "pending" }, { merge: true });
         };
 
+        // --- PAIN TRACKING ---
+
+        window.painBadgeClass = (level) => {
+            if (level <= 2) return 'bg-emerald-50 text-emerald-600 border border-emerald-200';
+            if (level <= 5) return 'bg-amber-50 text-amber-600 border border-amber-200';
+            return 'bg-red-50 text-red-600 border border-red-200';
+        };
+
+        const painValueColor = (level) => {
+            if (level <= 2) return '#10b981';
+            if (level <= 5) return '#eab308';
+            if (level <= 7) return '#f97316';
+            return '#ef4444';
+        };
+
+        const painValueLabel = (level) => {
+            if (level == 0) return 'No Pain';
+            if (level <= 2) return 'Mild';
+            if (level <= 5) return 'Moderate';
+            if (level <= 7) return 'Significant';
+            return 'Severe';
+        };
+
+        window.updatePainDisplay = (val) => {
+            document.getElementById('pain-value-display').innerText = val;
+            document.getElementById('pain-value-display').style.color = painValueColor(val);
+            document.getElementById('pain-value-label').innerText = painValueLabel(val);
+        };
+
+        window.openPainModal = (runId, workoutLabel) => {
+            currentPainRunId = runId;
+            const existing = runLogData[runId]?.painLevel ?? 0;
+            document.getElementById('pain-modal-workout').innerText = workoutLabel;
+            document.getElementById('pain-slider').value = existing;
+            window.updatePainDisplay(existing);
+            const modal = document.getElementById('pain-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        };
+
+        window.closePainModal = () => {
+            const modal = document.getElementById('pain-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            currentPainRunId = null;
+        };
+
+        window.savePainLevel = async () => {
+            if (!currentPainRunId) return;
+            const val = parseInt(document.getElementById('pain-slider').value, 10);
+            await setDoc(doc(db, `users/${activeUser}`, "runLogs", currentPainRunId), { painLevel: val }, { merge: true });
+            window.closePainModal();
+        };
+
+        window.renderPainChart = () => {
+            const canvas = document.getElementById('pain-chart');
+            const emptyState = document.getElementById('pain-chart-empty');
+            const summaryEl = document.getElementById('pain-trend-summary');
+            if (!canvas) return;
+
+            const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+            const points = [];
+            trainingPlanData.forEach((week) => {
+                days.forEach((day, dIdx) => {
+                    const runId = `w${week.week}d${dIdx}`;
+                    const log = runLogData[runId];
+                    if (log && log.painLevel != null) {
+                        const date = new Date(planStartDate.getTime() + ((week.week - 1) * 7 + dIdx) * 864e5);
+                        points.push({ date, level: log.painLevel, label: week[day] || '' });
+                    }
+                });
+            });
+            points.sort((a, b) => a.date - b.date);
+
+            if (points.length === 0) {
+                canvas.style.display = 'none';
+                emptyState.style.display = 'block';
+                if (summaryEl) summaryEl.innerText = '';
+                if (painChart) { painChart.destroy(); painChart = null; }
+                return;
+            }
+            canvas.style.display = 'block';
+            emptyState.style.display = 'none';
+
+            if (summaryEl) {
+                const latest = points[points.length - 1];
+                const avg = (points.reduce((s, p) => s + p.level, 0) / points.length).toFixed(1);
+                summaryEl.innerText = `Latest: ${latest.level}/10 · Avg: ${avg}/10`;
+            }
+
+            const labels = points.map(p => p.date.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }));
+            const data = points.map(p => p.level);
+
+            if (painChart) painChart.destroy();
+            const ctx = canvas.getContext('2d');
+            const gradient = ctx.createLinearGradient(0, 0, 0, 220);
+            gradient.addColorStop(0, 'rgba(20,184,166,0.25)');
+            gradient.addColorStop(1, 'rgba(20,184,166,0)');
+
+            painChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [{
+                        data,
+                        borderColor: '#14b8a6',
+                        backgroundColor: gradient,
+                        borderWidth: 3,
+                        pointRadius: 4,
+                        pointBackgroundColor: data.map(painValueColor),
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2,
+                        tension: 0.4,
+                        fill: true,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { min: 0, max: 10, ticks: { stepSize: 2 }, grid: { color: '#f1f5f9' } },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+        };
+
         window.renderProgressStat = () => {
             const statEl = document.getElementById('progress-stat');
             const fillEl = document.getElementById('progress-bar-fill');
@@ -293,11 +467,11 @@
             unsubs.forEach(unsub => unsub()); unsubs = [];
             unsubs.push(onSnapshot(collection(db, `users/${activeUser}`, "planData"), (snap) => {
                 trainingPlanData = []; snap.forEach(d => trainingPlanData.push({ week: parseInt(d.id.replace('week','')), ...d.data() }));
-                trainingPlanData.sort((a,b) => a.week - b.week); window.renderPlan(); updateMap(); window.renderProgressStat();
+                trainingPlanData.sort((a,b) => a.week - b.week); window.renderPlan(); updateMap(); window.renderProgressStat(); window.renderPainChart();
             }));
             unsubs.push(onSnapshot(collection(db, `users/${activeUser}`, "runLogs"), (snap) => {
                 runLogData = {}; snap.forEach(d => runLogData[d.id] = d.data());
-                window.renderPlan(); updateMap(); window.renderProgressStat();
+                window.renderPlan(); updateMap(); window.renderProgressStat(); window.renderPainChart();
             }));
         }
 
