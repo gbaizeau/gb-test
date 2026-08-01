@@ -210,13 +210,21 @@
                     ? (isPast ? 'bg-emerald-50/40 shadow-md' : 'bg-white shadow-md')
                     : (isPast ? 'bg-emerald-50/60 opacity-80' : 'bg-slate-50 opacity-60');
                 weekDiv.className = `week-container rounded-[1.5rem] border ${isPast ? 'border-emerald-100' : 'border-slate-100'} overflow-hidden transition-all ${stateClasses}`;
-                
+
+                const dayNamesForTotal = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+                let weekActualKm = 0;
+                dayNamesForTotal.forEach((day, dIdx) => {
+                    const log = runLogData[`w${week.week}d${dIdx}`];
+                    if (log && log.status === 'completed') weekActualKm += (parseFloat(log.actualDistance) || 0);
+                });
+                const weekActualDisplay = Math.round(weekActualKm * 10) / 10;
+
                 weekDiv.innerHTML = `
                     <div class="week-header p-5 flex justify-between items-center ${isPast ? 'bg-emerald-50/70' : 'bg-white'}" onclick="window.toggleWeek(${week.week})">
                         <div class="flex items-center space-x-5">
                             <div class="flex flex-col">
                                 <span class="font-black text-slate-300 uppercase text-[9px] tracking-widest leading-none">Week ${week.week}</span>
-                                <span class="text-lg font-black text-slate-900 mt-1">${week.totalKm || 0} <span class="text-slate-300 font-bold text-[10px] uppercase">KM</span></span>
+                                <span class="text-lg font-black text-slate-900 mt-1">${weekActualDisplay > 0 ? `<span class="text-teal-600">${weekActualDisplay}</span><span class="text-slate-300 mx-0.5">/</span>` : ''}${week.totalKm || 0} <span class="text-slate-300 font-bold text-[10px] uppercase">KM</span></span>
                             </div>
                             ${week.week === currentWeekNum ? '<span class="bg-teal-500 text-white text-[8px] font-black px-2 py-1 rounded-md uppercase tracking-tighter">Current</span>' : ''}
                             ${isPast ? '<span class="bg-emerald-100 text-emerald-600 text-[8px] font-black px-2 py-1 rounded-md uppercase tracking-tighter">✓ Done</span>' : ''}
