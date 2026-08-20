@@ -517,7 +517,7 @@
             const pct = goal > 0 ? Math.min(100, (done / goal) * 100) : 0;
             statEl.innerText = `${Math.round(done)} / ${Math.round(goal)} km`;
             if (fillEl) fillEl.style.width = `${pct}%`;
-            const messages = [[0, "Let's go! 🏁"], [25, "Warming up nicely 🔥"], [50, "Halfway hero 💪"], [75, "Home stretch! 🚀"], [95, "Almost there! 🎉"]];
+            const messages = [[0, "Let's go! 🏁"], [25, "Warming up nicely 🔥"], [50, "Halfway hero 💪"], [75, "Home stretch! 🚀"], [90, "Almost there! 🎉"]];
             let msg = messages[0][1];
             messages.forEach(([threshold, text]) => { if (pct >= threshold) msg = text; });
             if (msgEl) msgEl.innerText = msg;
