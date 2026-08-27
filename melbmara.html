@@ -5,6 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Melbourne 2026 Hub</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏃</text></svg>">
+    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="MELB '26">
+    <meta name="theme-color" content="#0d9488">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -243,15 +249,17 @@
                 days.forEach((day, dIdx) => {
                     const workout = week[day] || "Rest";
                     const isRest = workout.toLowerCase() === 'rest';
-                    if (hideRest && isRest) return;
-
-                    const workoutDate = new Date(planStartDate.getTime() + ((week.week - 1) * 7 + dIdx) * 864e5);
                     const runId = `w${week.week}d${dIdx}`;
                     const log = runLogData[runId] || { status: 'pending', comments: [] };
                     const isCompleted = log.status === 'completed';
+                    const isStaleLog = isRest && isCompleted; // day is Rest now, but an old completed log is still counting toward totals
+
+                    if (hideRest && isRest && !isStaleLog) return;
+
+                    const workoutDate = new Date(planStartDate.getTime() + ((week.week - 1) * 7 + dIdx) * 864e5);
                     
                     const tr = document.createElement('div');
-                    tr.className = `flex flex-col sm:flex-row ${isRest ? 'rest-day-row' : ''} ${isCompleted ? 'matched-row' : (isRest ? '' : 'pending-row')}`;
+                    tr.className = `flex flex-col sm:flex-row ${isStaleLog ? '' : (isRest ? 'rest-day-row' : '')} ${isStaleLog ? 'bg-amber-50 border-l-4 border-amber-400' : (isCompleted ? 'matched-row' : (isRest ? '' : 'pending-row'))}`;
                     
                     tr.innerHTML = `
                         <div class="p-3 sm:p-6 sm:w-24 shrink-0 flex items-center gap-2 sm:flex-col sm:items-start sm:gap-0">
@@ -262,6 +270,7 @@
                             <div class="flex flex-col">
                                 <span class="text-base font-bold text-slate-800">${workout}</span>
                                 <p class="text-xs text-slate-500 mt-1 font-medium">${week[day+'_Detail'] || ''}</p>
+                                ${isStaleLog ? `<p class="text-xs text-amber-700 font-bold mt-2">⚠ This day is now Rest, but a completed run (${log.actualDistance ?? '?'}km) is still logged here and counted in your weekly total - probably left over from moving a run to a different day. Hit Undo to clear it.</p>` : ''}
                                 ${!isRest ? `
                                     <div class="mt-4 space-y-2">
                                         <div class="flex items-center justify-between">
@@ -278,7 +287,8 @@
                             </div>
                         </div>
                         <div class="p-3 sm:p-6 sm:text-right shrink-0 flex sm:block items-center">
-                            ${!isRest ? (isCompleted ? 
+                            ${isStaleLog ? `<button onclick="window.markUndone('${runId}')" class="bg-amber-100 border border-amber-300 px-4 py-2.5 sm:py-1.5 rounded-xl text-[10px] font-black text-amber-700 uppercase tracking-tighter hover:bg-amber-400 hover:text-white transition-all">Clear Stale Log</button>` :
+                            !isRest ? (isCompleted ? 
                                 `<div><p class="text-[10px] font-black text-emerald-600 uppercase mb-2 leading-none">✅ ${log.actualDistance ?? '?'}km</p>
                                     <div class="flex sm:justify-end space-x-3">
                                         <button onclick="window.editDistance('${runId}', '${workout.replace(/'/g, "\\'")}')" class="text-[10px] font-black text-slate-400 hover:text-teal-600 uppercase tracking-tighter">Edit</button>
@@ -517,7 +527,7 @@
             const pct = goal > 0 ? Math.min(100, (done / goal) * 100) : 0;
             statEl.innerText = `${Math.round(done)} / ${Math.round(goal)} km`;
             if (fillEl) fillEl.style.width = `${pct}%`;
-            const messages = [[0, "Let's go! 🏁"], [25, "Warming up nicely 🔥"], [50, "Halfway hero 💪"], [75, "Home stretch! 🚀"], [90, "Almost there! 🎉"]];
+            const messages = [[0, "Let's go! 🏁"], [25, "Warming up nicely 🔥"], [50, "Halfway hero 💪"], [75, "Home stretch! 🚀"], [95, "Almost there! 🎉"]];
             let msg = messages[0][1];
             messages.forEach(([threshold, text]) => { if (pct >= threshold) msg = text; });
             if (msgEl) msgEl.innerText = msg;
