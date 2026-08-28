@@ -254,6 +254,23 @@
                     const isCompleted = log.status === 'completed';
                     const isStaleLog = isRest && isCompleted; // day is Rest now, but an old completed log is still counting toward totals
 
+                    // Compare logged distance against what's currently planned - catches the case
+                    // where the plan changed after a day was already marked done.
+                    let mismatchNote = '';
+                    if (!isRest && isCompleted && log.actualDistance != null) {
+                        const plannedKm = parsePlannedKm(workout);
+                        if (plannedKm != null) {
+                            const actualKm = parseFloat(log.actualDistance);
+                            const diff = Math.abs(actualKm - plannedKm);
+                            const ratio = plannedKm > 0 ? actualKm / plannedKm : 1;
+                            if (diff >= 5 || ratio <= 0.5 || ratio >= 1.5) {
+                                mismatchNote = `<p class="text-[9px] font-black text-orange-500 uppercase mt-1 flex items-center gap-1">⚠ Planned was ${plannedKm}k</p>`;
+                            } else if (diff > 0.5) {
+                                mismatchNote = `<p class="text-[9px] text-slate-300 font-medium mt-1">Planned ${plannedKm}k</p>`;
+                            }
+                        }
+                    }
+
                     if (hideRest && isRest && !isStaleLog) return;
 
                     const workoutDate = new Date(planStartDate.getTime() + ((week.week - 1) * 7 + dIdx) * 864e5);
@@ -290,6 +307,7 @@
                             ${isStaleLog ? `<button onclick="window.markUndone('${runId}')" class="bg-amber-100 border border-amber-300 px-4 py-2.5 sm:py-1.5 rounded-xl text-[10px] font-black text-amber-700 uppercase tracking-tighter hover:bg-amber-400 hover:text-white transition-all">Clear Stale Log</button>` :
                             !isRest ? (isCompleted ? 
                                 `<div><p class="text-[10px] font-black text-emerald-600 uppercase mb-2 leading-none">✅ ${log.actualDistance ?? '?'}km</p>
+                                    ${mismatchNote}
                                     <div class="flex sm:justify-end space-x-3">
                                         <button onclick="window.editDistance('${runId}', '${workout.replace(/'/g, "\\'")}')" class="text-[10px] font-black text-slate-400 hover:text-teal-600 uppercase tracking-tighter">Edit</button>
                                         <button onclick="window.markUndone('${runId}')" class="text-[10px] font-black text-slate-400 hover:text-red-500 uppercase tracking-tighter">Undo</button>
