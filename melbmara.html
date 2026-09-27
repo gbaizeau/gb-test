@@ -592,7 +592,10 @@
                 });
                 let done = 0; logSnap.forEach(d => { if (d.data().status === 'completed') done += (parseFloat(d.data().actualDistance) || 0); });
                 const marker = document.getElementById(`marker-${u}`);
-                if (marker) marker.style.left = `${goal > 0 ? Math.min(98, (done/goal)*100) : 0}%`;
+                if (marker) {
+                    const pct = goal > 0 ? Math.min(100, (done / goal) * 100) : 0;
+                    marker.style.left = `calc(${pct}% - 23px)`;
+                }
             }
         }
 
