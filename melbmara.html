@@ -13,6 +13,7 @@
     <meta name="theme-color" content="#0d9488">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; letter-spacing: -0.01em; }
@@ -74,6 +75,21 @@
                 <button onclick="window.closePainModal()" class="flex-1 bg-slate-100 text-slate-400 py-3.5 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-slate-200 transition-all">Cancel</button>
                 <button onclick="window.savePainLevel()" class="flex-1 bg-slate-900 text-white py-3.5 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-slate-800 transition-all">Save</button>
             </div>
+        </div>
+    </div>
+
+    <!-- CELEBRATION MODAL -->
+    <div id="celebration-modal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[200] hidden items-center justify-center p-4">
+        <div class="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl p-8 text-center space-y-6 relative overflow-hidden border-4 border-teal-500">
+            <div class="text-6xl animate-bounce">🏆🎉</div>
+            <div>
+                <span id="celeb-user-badge" class="bg-teal-500 text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest">USER</span>
+                <h2 id="celeb-title" class="text-3xl font-black text-slate-900 tracking-tighter mt-3">MARATHON COMPLETED!</h2>
+            </div>
+            <p id="celeb-message" class="text-sm font-semibold text-slate-600 leading-relaxed bg-slate-50 p-5 rounded-2xl border border-slate-100"></p>
+            <button onclick="window.closeCelebrationModal()" class="w-full bg-slate-900 text-white py-4 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-teal-600 transition-all shadow-lg">
+                HELL YES! 🚀
+            </button>
         </div>
     </div>
 
@@ -178,6 +194,49 @@
         const currentWeekNum = Math.max(1, Math.min(12, Math.floor((new Date() - planStartDate) / (7 * 864e5)) + 1));
         expandedWeeks.add(currentWeekNum);
 
+        // --- CUSTOM CELEBRATION MESSAGES ---
+        const customCelebrationMessages = {
+            mimi: "Congratulations Mimi, you are now officially a Marathoner!! 🏆 Time to celebrate with your favorite chouchou farci!! 🎉",
+            gregou: "Congratulations Gregou, you are now officially a Marathoner!! 🏆 Time to celebrate with your favorite chouchou farci!! 🎉"
+        };
+
+        window.triggerCelebration = (user) => {
+            const count = 200;
+            const defaults = { origin: { y: 0.7 } };
+
+            function fire(particleRatio, opts) {
+                confetti(Object.assign({}, defaults, opts, {
+                    particleCount: Math.floor(count * particleRatio)
+                }));
+            }
+
+            fire(0.25, { spread: 26, startVelocity: 55 });
+            fire(0.2, { spread: 60 });
+            fire(0.35, { spread: 100, decay: 0.91, scalar: 0.8 });
+            fire(0.1, { spread: 120, startVelocity: 25, decay: 0.92, scalar: 1.2 });
+            fire(0.1, { spread: 120, startVelocity: 45 });
+
+            const modal = document.getElementById('celebration-modal');
+            const badge = document.getElementById('celeb-user-badge');
+            const msgEl = document.getElementById('celeb-message');
+
+            if (badge) badge.innerText = user.toUpperCase();
+            if (msgEl) msgEl.innerText = customCelebrationMessages[user] || "YOU DID IT! Melbourne Marathon Completed! 🎉";
+
+            if (modal) {
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+            }
+        };
+
+        window.closeCelebrationModal = () => {
+            const modal = document.getElementById('celebration-modal');
+            if (modal) {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
+        };
+
         window.handleSignIn = async () => {
             try {
                 await signInWithPopup(auth, provider);
@@ -252,10 +311,8 @@
                     const runId = `w${week.week}d${dIdx}`;
                     const log = runLogData[runId] || { status: 'pending', comments: [] };
                     const isCompleted = log.status === 'completed';
-                    const isStaleLog = isRest && isCompleted; // day is Rest now, but an old completed log is still counting toward totals
+                    const isStaleLog = isRest && isCompleted;
 
-                    // Compare logged distance against what's currently planned - catches the case
-                    // where the plan changed after a day was already marked done.
                     let mismatchNote = '';
                     if (!isRest && isCompleted && log.actualDistance != null) {
                         const plannedKm = parsePlannedKm(workout);
@@ -323,14 +380,11 @@
             });
         };
 
-        // Parses the leading "Nk" distance out of a workout label, e.g. "12k Intervals" -> 12
         const parsePlannedKm = (workoutLabel) => {
             const m = workoutLabel.match(/(\d+(\.\d+)?)\s*k\b/i);
             return m ? parseFloat(m[1]) : null;
         };
 
-        // A week's target is dynamic: each day contributes max(planned, actual logged),
-        // so beating a planned distance grows the goal, it never just gets capped.
         const dynamicWeekGoal = (weekData, weekNum, logsByRunId) => {
             const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
             let total = 0;
@@ -351,6 +405,10 @@
                     actualDistance: planned,
                     status: "completed"
                 }, { merge: true });
+
+                if (runId === 'w12d6' || workoutLabel.toLowerCase().includes('marathon') || planned >= 42) {
+                    window.triggerCelebration(activeUser);
+                }
             } catch (e) {
                 console.error(e);
                 alert("Couldn't save - check your connection and try again.");
@@ -383,7 +441,14 @@
             const val = parseFloat(document.getElementById('distance-input').value);
             if (isNaN(val)) { window.closeDistanceModal(); return; }
             try {
-                await setDoc(doc(db, `users/${activeUser}`, "runLogs", currentDistanceRunId), { actualDistance: val }, { merge: true });
+                await setDoc(doc(db, `users/${activeUser}`, "runLogs", currentDistanceRunId), { 
+                    actualDistance: val,
+                    status: "completed"
+                }, { merge: true });
+
+                if (currentDistanceRunId === 'w12d6' || val >= 42) {
+                    window.triggerCelebration(activeUser);
+                }
             } catch (e) {
                 console.error(e);
                 alert("Couldn't save - check your connection and try again.");
@@ -622,7 +687,6 @@
                 document.getElementById('google-signin-btn').classList.remove('hidden');
             }
         });
-
 
         setInterval(() => {
             const now = new Date();
