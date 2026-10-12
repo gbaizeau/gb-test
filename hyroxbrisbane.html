@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hyrox Brisbane 2027 Hub</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏋️‍♂️</text></svg>">
+    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="HYROX '27">
+    <meta name="theme-color" content="#0d9488">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; letter-spacing: -0.01em; }
+        .matched-row { background-color: #ecfdf5 !important; border-left: 4px solid #10b981 !important; }
+        .pending-row { background-color: #f0f9ff !important; border-left: 4px solid #0ea5e9 !important; }
+        .rest-day-row { opacity: 0.25; filter: grayscale(1); background-color: #f8fafc; }
+        .week-header { cursor: pointer; transition: all 0.2s; }
+        .map-track { position: relative; width: 100%; height: 80px; background: #f1f5f9; border-radius: 40px; border: 2px solid #e2e8f0; margin: 20px 0; }
+        .avatar-marker { position: absolute; transition: all 1s cubic-bezier(0.34, 1.56, 0.64, 1); filter: drop-shadow(0 4px 6px rgba(0,0,0,0.1)); z-index: 10; }
+        #marker-mimi { top: -22px; } #marker-gregou { bottom: -22px; }
+        .avatar-bubble { background: white; border-radius: 50%; padding: 4px; border: 3px solid; width: 46px; height: 46px; display: flex; align-items: center; justify-content: center; font-size: 22px; }
+        .switch { position: relative; display: inline-block; width: 34px; height: 20px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #e2e8f0; transition: .4s; border-radius: 20px; }
+        .slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: #14b8a6; }
+        input:checked + .slider:before { transform: translateX(14px); }
+        #pain-slider { -webkit-appearance: none; appearance: none; width: 100%; height: 10px; border-radius: 10px;
+            background: linear-gradient(to right, #10b981 0%, #10b981 25%, #eab308 50%, #f97316 75%, #ef4444 100%); }
+        #pain-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 28px; height: 28px; background: white;
+            border: 4px solid #0f172a; border-radius: 50%; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.25); }
+        #pain-slider::-moz-range-thumb { width: 28px; height: 28px; background: white; border: 4px solid #0f172a;
+            border-radius: 50%; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.25); }
+        .pain-badge { transition: all 0.15s; }
+        .pain-badge:hover { transform: scale(1.05); }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900">
+
+    <div id="distance-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] hidden items-center justify-center p-4">
+        <div class="bg-white w-full max-w-sm rounded-[2.5rem] shadow-2xl p-8">
+            <h3 class="text-xl font-black tracking-tighter text-slate-900 mb-1 text-center">Actual Distance / Volume</h3>
+            <p id="distance-modal-workout" class="text-[10px] font-black text-sky-500 uppercase tracking-widest mb-8 text-center"></p>
+            <div class="flex items-center justify-center mb-8">
+                <input type="number" step="0.1" min="0" id="distance-input" inputmode="decimal" class="text-5xl font-black text-slate-900 text-center w-32 border-b-4 border-slate-200 focus:border-teal-500 outline-none pb-1 bg-transparent">
+                <span class="text-slate-300 font-black text-2xl ml-2">km</span>
+            </div>
+            <div class="flex space-x-3">
+                <button onclick="window.closeDistanceModal()" class="flex-1 bg-slate-100 text-slate-400 py-3.5 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-slate-200 transition-all">Cancel</button>
+                <button onclick="window.saveDistance()" class="flex-1 bg-slate-900 text-white py-3.5 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-slate-800 transition-all">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="pain-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] hidden items-center justify-center p-4">
+        <div class="bg-white w-full max-w-sm rounded-[2.5rem] shadow-2xl p-8">
+            <h3 class="text-xl font-black tracking-tighter text-slate-900 mb-1 text-center">Pain Level</h3>
+            <p id="pain-modal-workout" class="text-[10px] font-black text-sky-500 uppercase tracking-widest mb-8 text-center"></p>
+            <div class="text-center mb-2">
+                <span id="pain-value-display" class="text-6xl font-black tracking-tighter text-emerald-500">0</span>
+                <span class="text-slate-300 font-black text-xl">/10</span>
+            </div>
+            <p id="pain-value-label" class="text-center text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6">No Pain</p>
+            <input type="range" min="0" max="10" step="1" value="0" id="pain-slider" oninput="window.updatePainDisplay(this.value)">
+            <div class="flex justify-between text-[9px] font-black text-slate-300 uppercase mt-2 mb-8">
+                <span>No pain</span><span>Severe</span>
+            </div>
+            <div class="flex space-x-3">
+                <button onclick="window.closePainModal()" class="flex-1 bg-slate-100 text-slate-400 py-3.5 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-slate-200 transition-all">Cancel</button>
+                <button onclick="window.savePainLevel()" class="flex-1 bg-slate-900 text-white py-3.5 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-slate-800 transition-all">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CELEBRATION MODAL -->
+    <div id="celebration-modal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[200] hidden items-center justify-center p-4">
+        <div class="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl p-8 text-center space-y-6 relative overflow-hidden border-4 border-teal-500">
+            <div class="text-6xl animate-bounce">🏋️‍♂️🔥🏆</div>
+            <div>
+                <span id="celeb-user-badge" class="bg-teal-500 text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest">USER</span>
+                <h2 id="celeb-title" class="text-3xl font-black text-slate-900 tracking-tighter mt-3">HYROX BRISBANE COMPLETED!</h2>
+            </div>
+            <p id="celeb-message" class="text-sm font-semibold text-slate-600 leading-relaxed bg-slate-50 p-5 rounded-2xl border border-slate-100"></p>
+            <button onclick="window.closeCelebrationModal()" class="w-full bg-slate-900 text-white py-4 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-teal-600 transition-all shadow-lg">
+                HELL YES! 🍻🎉
+            </button>
+        </div>
+    </div>
+
+    <nav class="fixed top-0 w-full bg-white/90 backdrop-blur-md border-b border-slate-200 z-50 px-3 sm:px-6 py-3 flex justify-between items-center">
+        <div class="flex items-center space-x-2 sm:space-x-6">
+            <h1 class="text-lg sm:text-xl font-black tracking-tighter text-teal-600">HYROX '27</h1>
+            <div class="flex bg-slate-100 p-1 rounded-xl">
+                <button onclick="window.switchProfile('mimi')" id="btn-mimi" class="px-3 sm:px-6 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all bg-white shadow-sm text-teal-600">Mimi</button>
+                <button onclick="window.switchProfile('gregou')" id="btn-gregou" class="px-3 sm:px-6 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all text-slate-500">Gregou</button>
+            </div>
+        </div>
+        <div id="auth-container" class="flex items-center space-x-2 sm:space-x-4">
+            <div id="user-info" class="hidden flex items-center space-x-2 sm:space-x-3">
+                <span id="user-name" class="hidden sm:inline text-sm font-bold text-slate-700"></span>
+                <button onclick="window.handleSignOut()" class="text-[10px] bg-slate-100 px-2 py-1 rounded-md text-slate-400 font-bold uppercase hover:bg-red-50 hover:text-red-500 transition-all">Sign Out</button>
+            </div>
+            <button id="google-signin-btn" onclick="window.handleSignIn()" class="bg-blue-600 text-white px-3 sm:px-5 py-2 rounded-xl text-sm font-bold shadow-lg">Sign in</button>
+        </div>
+    </nav>
+
+    <div class="container mx-auto p-4 md:p-8 mt-24">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <aside class="space-y-6">
+                <section class="bg-white p-5 sm:p-8 rounded-[2rem] shadow-sm border border-slate-100 text-center">
+                    <div id="countdown" class="text-5xl sm:text-6xl font-black text-teal-600 tracking-tighter">--</div>
+                    <p class="text-[10px] text-slate-400 font-black uppercase mt-2 tracking-widest text-center">Days to Hyrox Brisbane</p>
+                </section>
+                <section class="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100 text-center">
+                    <h2 class="text-[10px] font-black text-slate-400 uppercase mb-3 tracking-widest">Logged So Far</h2>
+                    <div id="progress-stat" class="text-3xl font-black text-teal-600 tracking-tighter">--</div>
+                    <div id="progress-bar-track" class="w-full h-2 bg-slate-100 rounded-full mt-4 overflow-hidden">
+                        <div id="progress-bar-fill" class="h-full bg-teal-500 rounded-full transition-all" style="width:0%"></div>
+                    </div>
+                    <p id="progress-fun-msg" class="text-[10px] text-slate-400 font-bold uppercase mt-3 tracking-widest"></p>
+                </section>
+            </aside>
+
+            <div class="lg:col-span-2 space-y-6">
+                <section class="bg-white p-5 sm:p-8 md:p-12 rounded-[2rem] shadow-sm border border-slate-100">
+                    <h2 class="text-xs font-black text-slate-400 uppercase mb-8 sm:mb-12 tracking-widest text-center tracking-[0.2em]">Road to Hyrox Brisbane (Mixed Doubles)</h2>
+                    <div class="map-track">
+                        <div class="absolute right-0 h-full w-2 bg-teal-500/20 border-r-4 border-teal-500 border-dashed"></div>
+                        <div id="marker-mimi" class="avatar-marker" style="left: 0%;"><div class="avatar-bubble border-pink-400 text-pink-500">👸</div></div>
+                        <div id="marker-gregou" class="avatar-marker" style="left: 0%;"><div class="avatar-bubble border-blue-500 text-blue-600">🏋️‍♂️</div></div>
+                    </div>
+                </section>
+
+                <section class="bg-white p-4 md:p-8 rounded-[2rem] shadow-sm border border-slate-100">
+                    <div class="mb-8 flex justify-between items-center px-4">
+                        <h2 class="text-4xl font-black text-slate-900 tracking-tighter" id="display-name">Mimi's Plan</h2>
+                        <div class="flex items-center space-x-3 bg-slate-50 px-4 py-2 rounded-2xl border border-slate-100">
+                            <span class="text-[10px] font-black text-slate-400 uppercase">Hide Rest</span>
+                            <label class="switch"><input type="checkbox" id="hide-rest-toggle" checked onchange="window.renderPlan()"><span class="slider"></span></label>
+                        </div>
+                    </div>
+                    <div id="plan-container" class="space-y-6"></div>
+                </section>
+
+                <section class="bg-white p-5 sm:p-8 rounded-[2rem] shadow-sm border border-slate-100">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-xs font-black text-slate-400 uppercase tracking-widest">Pain Trend</h2>
+                        <span id="pain-trend-summary" class="text-[10px] font-black text-slate-400 uppercase tracking-widest"></span>
+                    </div>
+                    <div id="pain-chart-empty" class="text-center py-12 text-sm text-slate-300 font-bold">No pain logged yet - tap "Log Pain" on any session to start tracking.</div>
+                    <div style="height: 220px;"><canvas id="pain-chart"></canvas></div>
+                </section>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.7/firebase-app.js";
+        import { getFirestore, doc, onSnapshot, setDoc, collection, arrayUnion, arrayRemove, getDocs } from "https://www.gstatic.com/firebasejs/9.6.7/firebase-firestore.js";
+        import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.6.7/firebase-auth.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyAscCQCTKwszBKcHlaJB5Zgm0X_dOUPw5Y",
+            authDomain: "melbmara2026.firebaseapp.com",
+            projectId: "melbmara2026",
+            storageBucket: "melbmara2026.firebasestorage.app",
+            messagingSenderId: "968047511570",
+            appId: "1:968047511570:web:367e6129673359b61430cb"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        const provider = new GoogleAuthProvider();
+
+        const planStartDate = new Date("2027-01-04T00:00:00");
+        const raceDate = new Date("2027-03-27T08:00:00");
+
+        let activeUser = "mimi";
+        let trainingPlanData = []; 
+        let runLogData = {};
+        let expandedWeeks = new Set();
+        let unsubs = [];
+        let painChart = null;
+        let currentPainRunId = null;
+
+        const currentWeekNum = Math.max(1, Math.min(12, Math.floor((new Date() - planStartDate) / (7 * 864e5)) + 1));
+        expandedWeeks.add(currentWeekNum);
+
+        // --- CUSTOM CELEBRATION MESSAGES ---
+        const customCelebrationMessages = {
+            mimi: "Congratulations Mimi, you are now officially a Hyrox Finisher in Mixed Doubles!! 🏆 Time to celebrate with your favorite chouchou farci & Brisbane drinks!! 🎉",
+            gregou: "Congratulations Gregou, you are now officially a Hyrox Finisher in Mixed Doubles!! 🏆 Time to celebrate with your favorite chouchou farci & Brisbane drinks!! 🎉"
+        };
+
+        window.triggerCelebration = (user) => {
+            const count = 200;
+            const defaults = { origin: { y: 0.7 } };
+
+            function fire(particleRatio, opts) {
+                confetti(Object.assign({}, defaults, opts, {
+                    particleCount: Math.floor(count * particleRatio)
+                }));
+            }
+
+            fire(0.25, { spread: 26, startVelocity: 55 });
+            fire(0.2, { spread: 60 });
+            fire(0.35, { spread: 100, decay: 0.91, scalar: 0.8 });
+            fire(0.1, { spread: 120, startVelocity: 25, decay: 0.92, scalar: 1.2 });
+            fire(0.1, { spread: 120, startVelocity: 45 });
+
+            const modal = document.getElementById('celebration-modal');
+            const badge = document.getElementById('celeb-user-badge');
+            const msgEl = document.getElementById('celeb-message');
+
+            if (badge) badge.innerText = user.toUpperCase();
+            if (msgEl) msgEl.innerText = customCelebrationMessages[user] || "YOU DID IT! Hyrox Brisbane Completed! 🎉";
+
+            if (modal) {
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+            }
+        };
+
+        window.closeCelebrationModal = () => {
+            const modal = document.getElementById('celebration-modal');
+            if (modal) {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
+        };
+
+        window.handleSignIn = async () => {
+            try {
+                await signInWithPopup(auth, provider);
+            } catch (e) {
+                console.error(e);
+                alert("Sign-in failed: " + e.message);
+            }
+        };
+        window.handleSignOut = () => signOut(auth);
+
+        window.switchProfile = (name) => {
+            activeUser = name;
+            document.getElementById('display-name').innerText = name.charAt(0).toUpperCase() + name.slice(1) + "'s Plan";
+            document.getElementById('btn-mimi').className = name === 'mimi' ? 'px-6 py-1.5 rounded-lg text-sm font-semibold bg-white shadow-sm text-teal-600' : 'px-6 py-1.5 rounded-lg text-sm font-semibold text-slate-500';
+            document.getElementById('btn-gregou').className = name === 'gregou' ? 'px-6 py-1.5 rounded-lg text-sm font-semibold bg-white shadow-sm text-teal-600' : 'px-6 py-1.5 rounded-lg text-sm font-semibold text-slate-500';
+            initSync();
+        };
+
+        window.toggleWeek = (num) => {
+            if (expandedWeeks.has(num)) expandedWeeks.delete(num);
+            else expandedWeeks.add(num);
+            window.renderPlan();
+        };
+
+        window.renderPlan = () => {
+            const container = document.getElementById('plan-container');
+            if (!container) return;
+            const hideRest = document.getElementById('hide-rest-toggle')?.checked || false;
+            container.innerHTML = '';
+
+            trainingPlanData.forEach((week) => {
+                const isExpanded = expandedWeeks.has(week.week);
+                const isPast = week.week < currentWeekNum;
+                const weekDiv = document.createElement('div');
+                const stateClasses = isExpanded
+                    ? (isPast ? 'bg-emerald-50/40 shadow-md' : 'bg-white shadow-md')
+                    : (isPast ? 'bg-emerald-50/60 opacity-80' : 'bg-slate-50 opacity-60');
+                weekDiv.className = `week-container rounded-[1.5rem] border ${isPast ? 'border-emerald-100' : 'border-slate-100'} overflow-hidden transition-all ${stateClasses}`;
+
+                const dayNamesForTotal = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+                let weekActualKm = 0;
+                dayNamesForTotal.forEach((day, dIdx) => {
+                    const log = runLogData[`w${week.week}d${dIdx}`];
+                    if (log && log.status === 'completed') weekActualKm += (parseFloat(log.actualDistance) || 0);
+                });
+                const weekActualDisplay = Math.round(weekActualKm * 10) / 10;
+                const weekGoalDisplay = Math.round(dynamicWeekGoal(week, week.week, runLogData) * 10) / 10;
+
+                weekDiv.innerHTML = `
+                    <div class="week-header p-5 flex justify-between items-center ${isPast ? 'bg-emerald-50/70' : 'bg-white'}" onclick="window.toggleWeek(${week.week})">
+                        <div class="flex items-center space-x-5">
+                            <div class="flex flex-col">
+                                <span class="font-black text-slate-300 uppercase text-[9px] tracking-widest leading-none">Week ${week.week}</span>
+                                <span class="text-lg font-black text-slate-900 mt-1">${weekActualDisplay > 0 ? `<span class="text-teal-600">${weekActualDisplay}</span><span class="text-slate-300 mx-0.5">/</span>` : ''}${weekGoalDisplay} <span class="text-slate-300 font-bold text-[10px] uppercase">KM</span></span>
+                            </div>
+                            ${week.week === currentWeekNum ? '<span class="bg-teal-500 text-white text-[8px] font-black px-2 py-1 rounded-md uppercase tracking-tighter">Current</span>' : ''}
+                            ${isPast ? '<span class="bg-emerald-100 text-emerald-600 text-[8px] font-black px-2 py-1 rounded-md uppercase tracking-tighter">✓ Done</span>' : ''}
+                        </div>
+                        <span class="text-[10px] font-black text-slate-400 uppercase">${isExpanded ? 'Collapse' : 'Expand'}</span>
+                    </div>
+                    <div class="week-content ${isExpanded ? '' : 'hidden'} border-t border-slate-50">
+                        <div id="week-body-${week.week}" class="divide-y divide-slate-50"></div>
+                    </div>
+                `;
+                
+                const tbody = weekDiv.querySelector(`#week-body-${week.week}`);
+                const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+                days.forEach((day, dIdx) => {
+                    const workout = week[day] || "Rest";
+                    const isRest = workout.toLowerCase() === 'rest';
+                    const runId = `w${week.week}d${dIdx}`;
+                    const log = runLogData[runId] || { status: 'pending', comments: [] };
+                    const isCompleted = log.status === 'completed';
+                    const isStaleLog = isRest && isCompleted;
+
+                    let mismatchNote = '';
+                    if (!isRest && isCompleted && log.actualDistance != null) {
+                        const plannedKm = parsePlannedKm(workout);
+                        if (plannedKm != null) {
+                            const actualKm = parseFloat(log.actualDistance);
+                            const diff = Math.abs(actualKm - plannedKm);
+                            const ratio = plannedKm > 0 ? actualKm / plannedKm : 1;
+                            if (diff >= 5 || ratio <= 0.5 || ratio >= 1.5) {
+                                mismatchNote = `<p class="text-[9px] font-black text-orange-500 uppercase mt-1 flex items-center gap-1">⚠ Planned was ${plannedKm}k</p>`;
+                            } else if (diff > 0.5) {
+                                mismatchNote = `<p class="text-[9px] text-slate-300 font-medium mt-1">Planned ${plannedKm}k</p>`;
+                            }
+                        }
+                    }
+
+                    if (hideRest && isRest && !isStaleLog) return;
+
+                    const workoutDate = new Date(planStartDate.getTime() + ((week.week - 1) * 7 + dIdx) * 864e5);
+                    
+                    const tr = document.createElement('div');
+                    tr.className = `flex flex-col sm:flex-row ${isStaleLog ? '' : (isRest ? 'rest-day-row' : '')} ${isStaleLog ? 'bg-amber-50 border-l-4 border-amber-400' : (isCompleted ? 'matched-row' : (isRest ? '' : 'pending-row'))}`;
+                    
+                    tr.innerHTML = `
+                        <div class="p-3 sm:p-6 sm:w-24 shrink-0 flex items-center gap-2 sm:flex-col sm:items-start sm:gap-0">
+                            <p class="text-[10px] font-black text-slate-300 uppercase leading-none">${day}</p>
+                            <p class="text-xs font-bold text-slate-600">${workoutDate.toLocaleDateString('en-AU', {day:'numeric', month:'short'})}</p>
+                        </div>
+                        <div class="p-3 sm:p-6 flex-1 min-w-0">
+                            <div class="flex flex-col">
+                                <span class="text-base font-bold text-slate-800">${workout}</span>
+                                <p class="text-xs text-slate-500 mt-1 font-medium">${week[day+'_Detail'] || ''}</p>
+                                ${isStaleLog ? `<p class="text-xs text-amber-700 font-bold mt-2">⚠ This day is now Rest, but a completed session is still logged here. Hit Undo to clear it.</p>` : ''}
+                                ${!isRest ? `
+                                    <div class="mt-4 space-y-2">
+                                        <div class="flex items-center justify-between">
+                                            <div class="space-y-1.5 flex-1">${(log.comments || []).map((c, cIdx) => `<div class="comment-item text-[11px] bg-white/50 p-2.5 rounded-xl border border-slate-100 flex items-start justify-between gap-2"><span><span class="font-black text-teal-600 uppercase text-[9px] mr-1">${c.user}:</span><span class="text-slate-600 font-medium">${c.text}</span></span>${auth.currentUser && c.user === auth.currentUser.displayName.split(' ')[0] ? `<button onclick="window.deleteComment('${runId}',${cIdx})" class="text-slate-300 hover:text-red-500 shrink-0 text-sm leading-none px-1">×</button>` : ''}</div>`).join('')}</div>
+                                        </div>
+                                        <button onclick="window.openPainModal('${runId}', '${workout.replace(/'/g, "\\'")}')" class="pain-badge inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-tighter ${log.painLevel != null ? window.painBadgeClass(log.painLevel) : 'bg-slate-50 text-slate-300 border border-slate-100'}">
+                                            ${log.painLevel != null ? `🩹 Pain ${log.painLevel}/10` : '+ Log Pain'}
+                                        </button>
+                                        <div class="flex mt-3 shadow-sm rounded-xl overflow-hidden border border-slate-100">
+                                            <input type="text" id="input-${runId}" placeholder="Note..." class="bg-white border-none text-base sm:text-[13px] px-4 py-3 sm:py-2 w-full focus:ring-0 min-w-0">
+                                            <button onclick="window.postComment('${runId}')" class="bg-slate-900 text-white px-4 text-[11px] font-black uppercase tracking-widest shrink-0">Post</button>
+                                        </div>
+                                    </div>` : ''}
+                            </div>
+                        </div>
+                        <div class="p-3 sm:p-6 sm:text-right shrink-0 flex sm:block items-center">
+                            ${isStaleLog ? `<button onclick="window.markUndone('${runId}')" class="bg-amber-100 border border-amber-300 px-4 py-2.5 sm:py-1.5 rounded-xl text-[10px] font-black text-amber-700 uppercase tracking-tighter hover:bg-amber-400 hover:text-white transition-all">Clear Stale Log</button>` :
+                            !isRest ? (isCompleted ? 
+                                `<div><p class="text-[10px] font-black text-emerald-600 uppercase mb-2 leading-none">✅ ${log.actualDistance ?? '?'}km</p>
+                                    ${mismatchNote}
+                                    <div class="flex sm:justify-end space-x-3">
+                                        <button onclick="window.editDistance('${runId}', '${workout.replace(/'/g, "\\'")}')" class="text-[10px] font-black text-slate-400 hover:text-teal-600 uppercase tracking-tighter">Edit</button>
+                                        <button onclick="window.markUndone('${runId}')" class="text-[10px] font-black text-slate-400 hover:text-red-500 uppercase tracking-tighter">Undo</button>
+                                    </div>
+                                </div>` :
+                                `<button onclick="window.markDone('${runId}', '${workout.replace(/'/g, "\\'")}')" class="bg-teal-50 border border-teal-200 px-4 py-2.5 sm:py-1.5 rounded-xl text-[10px] font-black text-teal-600 uppercase tracking-tighter hover:bg-teal-500 hover:text-white hover:border-teal-500 transition-all">Done ✓</button>`
+                            ) : ''}
+                        </div>
+                    `;
+                    tbody.appendChild(tr);
+                });
+                if (tbody.children.length > 0) container.appendChild(weekDiv);
+            });
+        };
+
+        const parsePlannedKm = (workoutLabel) => {
+            const m = workoutLabel.match(/(\d+(\.\d+)?)\s*k\b/i);
+            return m ? parseFloat(m[1]) : null;
+        };
+
+        const dynamicWeekGoal = (weekData, weekNum, logsByRunId) => {
+            const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+            let total = 0;
+            days.forEach((day, dIdx) => {
+                const workout = weekData[day] || 'Rest';
+                const planned = parsePlannedKm(workout) || 0;
+                const log = logsByRunId[`w${weekNum}d${dIdx}`];
+                const actual = (log && log.status === 'completed') ? (parseFloat(log.actualDistance) || 0) : 0;
+                total += Math.max(planned, actual);
+            });
+            return total;
+        };
+
+        window.markDone = async (runId, workoutLabel) => {
+            const planned = parsePlannedKm(workoutLabel);
+            try {
+                await setDoc(doc(db, `users/${activeUser}`, "hyroxLogs", runId), {
+                    actualDistance: planned,
+                    status: "completed"
+                }, { merge: true });
+
+                if (runId === 'w12d6' || workoutLabel.toLowerCase().includes('hyrox') || planned >= 10) {
+                    window.triggerCelebration(activeUser);
+                }
+            } catch (e) {
+                console.error(e);
+                alert("Couldn't save - check your connection and try again.");
+            }
+        };
+
+        let currentDistanceRunId = null;
+
+        window.editDistance = (runId, workoutLabel) => {
+            currentDistanceRunId = runId;
+            const current = runLogData[runId]?.actualDistance ?? '';
+            document.getElementById('distance-modal-workout').innerText = workoutLabel || '';
+            const input = document.getElementById('distance-input');
+            input.value = current;
+            const modal = document.getElementById('distance-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            setTimeout(() => input.focus(), 50);
+        };
+
+        window.closeDistanceModal = () => {
+            const modal = document.getElementById('distance-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            currentDistanceRunId = null;
+        };
+
+        window.saveDistance = async () => {
+            if (!currentDistanceRunId) return;
+            const val = parseFloat(document.getElementById('distance-input').value);
+            if (isNaN(val)) { window.closeDistanceModal(); return; }
+            try {
+                await setDoc(doc(db, `users/${activeUser}`, "hyroxLogs", currentDistanceRunId), { 
+                    actualDistance: val,
+                    status: "completed"
+                }, { merge: true });
+
+                if (currentDistanceRunId === 'w12d6' || val >= 10) {
+                    window.triggerCelebration(activeUser);
+                }
+            } catch (e) {
+                console.error(e);
+                alert("Couldn't save - check your connection and try again.");
+                return;
+            }
+            window.closeDistanceModal();
+        };
+
+        window.markUndone = async (runId) => {
+            try {
+                await setDoc(doc(db, `users/${activeUser}`, "hyroxLogs", runId), { actualDistance: null, status: "pending" }, { merge: true });
+            } catch (e) {
+                console.error(e);
+                alert("Couldn't save - check your connection and try again.");
+            }
+        };
+
+        // --- PAIN TRACKING ---
+
+        window.painBadgeClass = (level) => {
+            if (level <= 2) return 'bg-emerald-50 text-emerald-600 border border-emerald-200';
+            if (level <= 5) return 'bg-amber-50 text-amber-600 border border-amber-200';
+            return 'bg-red-50 text-red-600 border border-red-200';
+        };
+
+        const painValueColor = (level) => {
+            if (level <= 2) return '#10b981';
+            if (level <= 5) return '#eab308';
+            if (level <= 7) return '#f97316';
+            return '#ef4444';
+        };
+
+        const painValueLabel = (level) => {
+            if (level == 0) return 'No Pain';
+            if (level <= 2) return 'Mild';
+            if (level <= 5) return 'Moderate';
+            if (level <= 7) return 'Significant';
+            return 'Severe';
+        };
+
+        window.updatePainDisplay = (val) => {
+            document.getElementById('pain-value-display').innerText = val;
+            document.getElementById('pain-value-display').style.color = painValueColor(val);
+            document.getElementById('pain-value-label').innerText = painValueLabel(val);
+        };
+
+        window.openPainModal = (runId, workoutLabel) => {
+            currentPainRunId = runId;
+            const existing = runLogData[runId]?.painLevel ?? 0;
+            document.getElementById('pain-modal-workout').innerText = workoutLabel;
+            document.getElementById('pain-slider').value = existing;
+            window.updatePainDisplay(existing);
+            const modal = document.getElementById('pain-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        };
+
+        window.closePainModal = () => {
+            const modal = document.getElementById('pain-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            currentPainRunId = null;
+        };
+
+        window.savePainLevel = async () => {
+            if (!currentPainRunId) return;
+            const val = parseInt(document.getElementById('pain-slider').value, 10);
+            try {
+                await setDoc(doc(db, `users/${activeUser}`, "hyroxLogs", currentPainRunId), { painLevel: val }, { merge: true });
+            } catch (e) {
+                console.error(e);
+                alert("Couldn't save - check your connection and try again.");
+                return;
+            }
+            window.closePainModal();
+        };
+
+        window.renderPainChart = () => {
+            const canvas = document.getElementById('pain-chart');
+            const emptyState = document.getElementById('pain-chart-empty');
+            const summaryEl = document.getElementById('pain-trend-summary');
+            if (!canvas) return;
+
+            const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+            const points = [];
+            trainingPlanData.forEach((week) => {
+                days.forEach((day, dIdx) => {
+                    const runId = `w${week.week}d${dIdx}`;
+                    const log = runLogData[runId];
+                    if (log && log.painLevel != null) {
+                        const date = new Date(planStartDate.getTime() + ((week.week - 1) * 7 + dIdx) * 864e5);
+                        points.push({ date, level: log.painLevel, label: week[day] || '' });
+                    }
+                });
+            });
+            points.sort((a, b) => a.date - b.date);
+
+            if (points.length === 0) {
+                canvas.style.display = 'none';
+                emptyState.style.display = 'block';
+                if (summaryEl) summaryEl.innerText = '';
+                if (painChart) { painChart.destroy(); painChart = null; }
+                return;
+            }
+            canvas.style.display = 'block';
+            emptyState.style.display = 'none';
+
+            if (summaryEl) {
+                const latest = points[points.length - 1];
+                const avg = (points.reduce((s, p) => s + p.level, 0) / points.length).toFixed(1);
+                summaryEl.innerText = `Latest: ${latest.level}/10 · Avg: ${avg}/10`;
+            }
+
+            const labels = points.map(p => p.date.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }));
+            const data = points.map(p => p.level);
+
+            if (painChart) painChart.destroy();
+            const ctx = canvas.getContext('2d');
+            const gradient = ctx.createLinearGradient(0, 0, 0, 220);
+            gradient.addColorStop(0, 'rgba(20,184,166,0.25)');
+            gradient.addColorStop(1, 'rgba(20,184,166,0)');
+
+            painChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [{
+                        data,
+                        borderColor: '#14b8a6',
+                        backgroundColor: gradient,
+                        borderWidth: 3,
+                        pointRadius: 4,
+                        pointBackgroundColor: data.map(painValueColor),
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2,
+                        tension: 0.4,
+                        fill: true,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { min: 0, max: 10, ticks: { stepSize: 2 }, grid: { color: '#f1f5f9' } },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+        };
+
+        window.renderProgressStat = () => {
+            const statEl = document.getElementById('progress-stat');
+            const fillEl = document.getElementById('progress-bar-fill');
+            const msgEl = document.getElementById('progress-fun-msg');
+            if (!statEl) return;
+            const goal = trainingPlanData.reduce((sum, w) => sum + dynamicWeekGoal(w, w.week, runLogData), 0);
+            const done = Object.values(runLogData).reduce((sum, log) => log.status === 'completed' ? sum + (parseFloat(log.actualDistance) || 0) : sum, 0);
+            const pct = goal > 0 ? Math.min(100, (done / goal) * 100) : 0;
+            statEl.innerText = `${Math.round(done)} / ${Math.round(goal)} km`;
+            if (fillEl) fillEl.style.width = `${pct}%`;
+            const messages = [[0, "Let's go Hyrox! 🏁"], [25, "Building the engine 🔥"], [50, "Compromised Running Beast 💪"], [75, "Brisbane ready! 🚀"], [95, "Race week time! 🎉"]];
+            let msg = messages[0][1];
+            messages.forEach(([threshold, text]) => { if (pct >= threshold) msg = text; });
+            if (msgEl) msgEl.innerText = msg;
+        };
+
+        window.postComment = async (runId) => {
+            const input = document.getElementById(`input-${runId}`);
+            if (!input?.value || !auth.currentUser) return;
+            const text = input.value;
+            try {
+                await setDoc(doc(db, `users/${activeUser}`, "hyroxLogs", runId), { comments: arrayUnion({ user: auth.currentUser.displayName.split(' ')[0], text, ts: Date.now() }) }, { merge: true });
+                input.value = '';
+            } catch (e) {
+                console.error(e);
+                alert("Couldn't save - check your connection and try again.");
+            }
+        };
+
+        window.deleteComment = async (runId, idx) => {
+            const log = runLogData[runId];
+            const comment = log?.comments?.[idx];
+            if (!comment) return;
+            try {
+                await setDoc(doc(db, `users/${activeUser}`, "hyroxLogs", runId), { comments: arrayRemove(comment) }, { merge: true });
+            } catch (e) {
+                console.error(e);
+                alert("Couldn't delete - check your connection and try again.");
+            }
+        };
+
+        // --- CORE SYNC ENGINE ---
+
+        async function updateMap() {
+            const users = ["mimi", "gregou"];
+            for (const u of users) {
+                const planSnap = await getDocs(collection(db, `users/${u}/hyroxPlanData`));
+                const logSnap = await getDocs(collection(db, `users/${u}/hyroxLogs`));
+                const logsByRunId = {};
+                logSnap.forEach(d => logsByRunId[d.id] = d.data());
+                let goal = 0;
+                planSnap.forEach(d => {
+                    const weekNum = parseInt(d.id.replace('week', ''));
+                    goal += dynamicWeekGoal(d.data(), weekNum, logsByRunId);
+                });
+                let done = 0; logSnap.forEach(d => { if (d.data().status === 'completed') done += (parseFloat(d.data().actualDistance) || 0); });
+                const marker = document.getElementById(`marker-${u}`);
+                if (marker) {
+                    const pct = goal > 0 ? Math.min(100, (done / goal) * 100) : 0;
+                    marker.style.left = `calc(${pct}% - 23px)`;
+                }
+            }
+        }
+
+        function initSync() {
+            unsubs.forEach(unsub => unsub()); unsubs = [];
+            unsubs.push(onSnapshot(collection(db, `users/${activeUser}`, "hyroxPlanData"), (snap) => {
+                trainingPlanData = []; snap.forEach(d => trainingPlanData.push({ week: parseInt(d.id.replace('week','')), ...d.data() }));
+                trainingPlanData.sort((a,b) => a.week - b.week); window.renderPlan(); updateMap(); window.renderProgressStat(); window.renderPainChart();
+            }));
+            unsubs.push(onSnapshot(collection(db, `users/${activeUser}`, "hyroxLogs"), (snap) => {
+                runLogData = {}; snap.forEach(d => runLogData[d.id] = d.data());
+                window.renderPlan(); updateMap(); window.renderProgressStat(); window.renderPainChart();
+            }));
+        }
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                document.getElementById('user-name').innerText = user.displayName;
+                document.getElementById('user-info').classList.remove('hidden');
+                document.getElementById('google-signin-btn').classList.add('hidden');
+                initSync();
+            } else {
+                document.getElementById('user-info').classList.add('hidden');
+                document.getElementById('google-signin-btn').classList.remove('hidden');
+            }
+        });
+
+        setInterval(() => {
+            const now = new Date();
+            const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            const raceMidnight = new Date(raceDate.getFullYear(), raceDate.getMonth(), raceDate.getDate());
+            const diffDays = Math.round((raceMidnight - todayMidnight) / 864e5);
+            const el = document.getElementById('countdown');
+            if (el) el.innerText = Math.max(0, diffDays);
+        }, 1000);
+    </script>
+</body>
+</html>
