@@ -124,4 +124,352 @@
                 <input type="range" id="pain-morning" min="0" max="10" value="0" class="w-full accent-sky-500 mb-4" oninput="document.getElementById('val-morning').innerText = this.value">
                 <div class="text-center text-2xl font-black text-sky-400 -mt-2 mb-4" id="val-morning">0</div>
 
-                <label class="block text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Douleur en activité (0
+                <label class="block text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Douleur en activité (0-10)</label>
+                <input type="range" id="pain-activity" min="0" max="10" value="0" class="w-full accent-sky-500 mb-4" oninput="document.getElementById('val-activity').innerText = this.value">
+                <div class="text-center text-2xl font-black text-sky-400 -mt-2 mb-6" id="val-activity">0</div>
+
+                <label class="block text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Notes du jour</label>
+                <textarea id="rehab-notes" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white mb-6" rows="3" placeholder="Sauts, exos serviette, sensations..."></textarea>
+
+                <button onclick="saveRehab()" class="w-full bg-emerald-500 hover:bg-emerald-400 text-white py-4 rounded-xl font-black uppercase tracking-widest text-sm transition-colors">Enregistrer le bilan</button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Firebase & Logic -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+        import { getFirestore, collection, doc, setDoc, getDoc, addDoc, onSnapshot, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+        import { getAuth, GoogleAuthProvider, signInWithRedirect, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+
+        // Ta vraie configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyBvtimU38lzUYpZhHkkt4WNPwlI-SjGvpM",
+            authDomain: "gymxmas2026.firebaseapp.com",
+            projectId: "gymxmas2026",
+            storageBucket: "gymxmas2026.firebasestorage.app",
+            messagingSenderId: "624713032080",
+            appId: "1:624713032080:web:3a5c9a4a4f47d228169315",
+            measurementId: "G-45ZERHMLXH"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        const provider = new GoogleAuthProvider();
+
+        let currentUser = null;
+        let isMimi = false;
+        let allLogs = [];
+        let customExercises = [];
+        let currentPlannedExercises = [];
+        let chartInstance = null;
+
+        const baseExercises = [
+            "Dead Hangs", "Scapular Pull-ups", "Lat Pulldown", "Biceps Curls", "Australian Rows",
+            "Dumbbell Bench Press", "Shoulder Press", "Leg Extension", "Leg Curl", "Triceps Pushdown",
+            "Banded Pull-ups", "Gainage", "Elastique Fessiers", "Goblet Squats", "Pompes", 
+            "Bulgarian Split Squats", "Lateral Raises", "Eccentric Pull-ups", "Deadlifts", "Dips"
+        ];
+
+        const getLocalDateStr = (d = new Date()) => {
+            const offset = d.getTimezoneOffset() * 60000;
+            return (new Date(d - offset)).toISOString().split('T')[0];
+        };
+
+        document.getElementById('plan-date').value = getLocalDateStr();
+
+        // --- AUTHENTIFICATION AVEC REDIRECT ---
+        document.getElementById('btn-login').addEventListener('click', () => {
+            try {
+                signInWithRedirect(auth, provider);
+            } catch (error) {
+                console.error("Erreur de connexion :", error);
+                alert("Erreur de connexion : " + error.message);
+            }
+        });
+
+        document.getElementById('btn-logout').addEventListener('click', () => signOut(auth));
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                currentUser = user;
+                // Détecter Mimi avec une sécurité si displayName est null
+                const name = user.displayName ? user.displayName.toLowerCase() : "";
+                isMimi = name.includes('mimi'); 
+                
+                document.getElementById('user-name').innerText = user.displayName ? user.displayName.split(' ')[0] : "Sportif";
+                document.getElementById('btn-login').classList.add('hidden');
+                document.getElementById('user-info').classList.remove('hidden');
+                document.getElementById('app-content').classList.remove('hidden');
+                if(isMimi) document.getElementById('tab-rehab').classList.remove('hidden');
+                
+                initApp();
+            } else {
+                currentUser = null;
+                document.getElementById('btn-login').classList.remove('hidden');
+                document.getElementById('user-info').classList.add('hidden');
+                document.getElementById('app-content').classList.add('hidden');
+            }
+        });
+
+        window.switchTab = (tab) => {
+            ['workout', 'plan', 'progress', 'rehab'].forEach(t => {
+                document.getElementById(`view-${t}`).classList.add('hidden');
+                document.getElementById(`tab-${t}`).classList.remove('active');
+            });
+            document.getElementById(`view-${tab}`).classList.remove('hidden');
+            document.getElementById(`tab-${tab}`).classList.add('active');
+            if(tab === 'progress') renderChart();
+            if(tab === 'plan') window.loadPlannedWorkout();
+        };
+
+        function initApp() {
+            onSnapshot(collection(db, `users/${currentUser.uid}/customExercises`), (snap) => {
+                customExercises = [];
+                snap.forEach(doc => customExercises.push(doc.data().name));
+                updateExerciseDropdowns();
+            });
+
+            const logsQuery = query(collection(db, `users/${currentUser.uid}/workoutLogs`), orderBy('ts', 'desc'));
+            onSnapshot(logsQuery, (snapshot) => {
+                allLogs = [];
+                snapshot.forEach(doc => allLogs.push({id: doc.id, ...doc.data()}));
+                renderTodaySets();
+                window.checkLastPerformance();
+            });
+
+            loadTodayWorkout();
+        }
+
+        function getAllExercises() {
+            const all = [...new Set([...baseExercises, ...customExercises])];
+            return all.sort();
+        }
+
+        function updateExerciseDropdowns() {
+            const allEx = getAllExercises();
+            const planSelect = document.getElementById('add-ex-select');
+            const chartSelect = document.getElementById('chart-exercise-select');
+            
+            const currentPlanVal = planSelect.value;
+            const currentChartVal = chartSelect.value;
+
+            planSelect.innerHTML = ''; chartSelect.innerHTML = '';
+            
+            allEx.forEach(ex => {
+                planSelect.add(new Option(ex, ex));
+                chartSelect.add(new Option(ex, ex));
+            });
+
+            if(currentPlanVal && allEx.includes(currentPlanVal)) planSelect.value = currentPlanVal;
+            if(currentChartVal && allEx.includes(currentChartVal)) chartSelect.value = currentChartVal;
+        }
+
+        window.loadPlannedWorkout = async () => {
+            const dateStr = document.getElementById('plan-date').value;
+            if(!dateStr) return;
+            
+            const docRef = doc(db, `users/${currentUser.uid}/plannedWorkouts`, dateStr);
+            const docSnap = await getDoc(docRef);
+            
+            if (docSnap.exists() && docSnap.data().exercises) {
+                currentPlannedExercises = docSnap.data().exercises;
+            } else {
+                currentPlannedExercises = [];
+            }
+            renderPlannedList();
+        };
+
+        function renderPlannedList() {
+            const container = document.getElementById('planned-exercises-list');
+            container.innerHTML = '';
+            if(currentPlannedExercises.length === 0) {
+                container.innerHTML = '<span class="text-slate-500 text-xs italic">Aucun exercice prévu.</span>';
+            } else {
+                currentPlannedExercises.forEach((ex, idx) => {
+                    const div = document.createElement('div');
+                    div.className = "flex justify-between items-center bg-slate-800 p-2 rounded";
+                    div.innerHTML = `
+                        <span class="text-sm font-bold text-sky-400">${ex}</span>
+                        <button onclick="removeExerciseFromPlan(${idx})" class="text-slate-500 hover:text-red-400 text-xl leading-none">&times;</button>
+                    `;
+                    container.appendChild(div);
+                });
+            }
+        }
+
+        window.addExerciseToPlan = async () => {
+            const ex = document.getElementById('add-ex-select').value;
+            if(!ex) return;
+            currentPlannedExercises.push(ex);
+            await savePlanToDB();
+        };
+
+        window.removeExerciseFromPlan = async (idx) => {
+            currentPlannedExercises.splice(idx, 1);
+            await savePlanToDB();
+        };
+
+        async function savePlanToDB() {
+            const dateStr = document.getElementById('plan-date').value;
+            await setDoc(doc(db, `users/${currentUser.uid}/plannedWorkouts`, dateStr), {
+                exercises: currentPlannedExercises
+            }, { merge: true });
+            renderPlannedList();
+            
+            if(dateStr === getLocalDateStr()) {
+                loadTodayWorkout();
+            }
+        }
+
+        window.createNewExercise = async () => {
+            const name = document.getElementById('new-ex-name').value.trim();
+            if(!name) return;
+            
+            await addDoc(collection(db, `users/${currentUser.uid}/customExercises`), { name });
+            document.getElementById('new-ex-name').value = '';
+            alert("Exercice créé et ajouté à la liste !");
+        };
+
+        async function loadTodayWorkout() {
+            const dateStr = getLocalDateStr();
+            const docRef = doc(db, `users/${currentUser.uid}/plannedWorkouts`, dateStr);
+            const docSnap = await getDoc(docRef);
+            
+            const exSelect = document.getElementById('exercise-select');
+            exSelect.innerHTML = '';
+            
+            if (docSnap.exists() && docSnap.data().exercises && docSnap.data().exercises.length > 0) {
+                document.getElementById('workout-status').innerText = "PLAN CHARGÉ";
+                document.getElementById('workout-status').className = "text-[10px] bg-emerald-900/50 text-emerald-400 border border-emerald-500/30 px-2 py-1 rounded font-bold";
+                
+                docSnap.data().exercises.forEach(ex => {
+                    exSelect.add(new Option(ex, ex));
+                });
+            } else {
+                document.getElementById('workout-status').innerText = "SÉANCE LIBRE";
+                document.getElementById('workout-status').className = "text-[10px] bg-slate-700 text-sky-400 px-2 py-1 rounded font-bold";
+                
+                const allEx = getAllExercises();
+                allEx.forEach(ex => exSelect.add(new Option(ex, ex)));
+            }
+            window.checkLastPerformance();
+        }
+
+        window.checkLastPerformance = () => {
+            const selectedEx = document.getElementById('exercise-select').value;
+            const banner = document.getElementById('last-perf-banner');
+            const perfData = document.getElementById('last-perf-data');
+            
+            if(!selectedEx) { banner.classList.add('hidden'); return; }
+
+            const todayStr = new Date().toDateString();
+            const lastLog = allLogs.find(l => l.exercise === selectedEx && new Date(l.ts?.toDate()).toDateString() !== todayStr);
+
+            if (lastLog) {
+                banner.classList.remove('hidden');
+                perfData.innerText = `${lastLog.weight}kg × ${lastLog.reps}`;
+            } else {
+                banner.classList.add('hidden');
+            }
+        };
+
+        window.saveSet = async () => {
+            const weight = parseFloat(document.getElementById('input-weight').value) || 0;
+            const reps = parseInt(document.getElementById('input-reps').value) || 0;
+            const exercise = document.getElementById('exercise-select').value;
+
+            if (!exercise) return alert("Sélectionne un exercice !");
+            if (reps === 0) return alert("Au moins 1 rep !");
+
+            try {
+                await addDoc(collection(db, `users/${currentUser.uid}/workoutLogs`), {
+                    exercise, weight, reps, ts: serverTimestamp()
+                });
+                document.getElementById('input-reps').value = ''; 
+            } catch (e) { console.error(e); alert("Erreur d'enregistrement."); }
+        };
+
+        function renderTodaySets() {
+            const container = document.getElementById('today-sets');
+            container.innerHTML = '';
+            const todayStr = new Date().toDateString();
+            
+            const todayLogs = allLogs.filter(l => l.ts && new Date(l.ts.toDate()).toDateString() === todayStr);
+            
+            if (todayLogs.length === 0) {
+                container.innerHTML = '<p class="text-sm text-slate-500 italic">Aucune série enregistrée aujourd\'hui.</p>';
+                return;
+            }
+
+            todayLogs.forEach(log => {
+                const div = document.createElement('div');
+                div.className = "bg-slate-800 border border-slate-700 p-3 rounded-xl flex justify-between items-center";
+                div.innerHTML = `<span class="font-bold text-slate-300 text-sm">${log.exercise}</span>
+                                 <span class="font-black text-sky-400">${log.weight}kg <span class="text-slate-500 text-xs mx-1">×</span> ${log.reps}</span>`;
+                container.appendChild(div);
+            });
+        }
+
+        window.saveRehab = async () => {
+            const morning = parseInt(document.getElementById('pain-morning').value);
+            const activity = parseInt(document.getElementById('pain-activity').value);
+            const notes = document.getElementById('rehab-notes').value;
+
+            try {
+                await addDoc(collection(db, `users/${currentUser.uid}/rehabLogs`), {
+                    painMorning: morning, painActivity: activity, notes, ts: serverTimestamp()
+                });
+                alert("Bilan Rehab enregistré !");
+                document.getElementById('rehab-notes').value = '';
+            } catch (e) { console.error(e); alert("Erreur d'enregistrement."); }
+        };
+
+        window.renderChart = () => {
+            const ctx = document.getElementById('progression-chart').getContext('2d');
+            const selectedEx = document.getElementById('chart-exercise-select').value;
+            
+            const exLogs = allLogs.filter(l => l.exercise === selectedEx && l.ts);
+            
+            const maxPerDay = {};
+            exLogs.forEach(log => {
+                const d = new Date(log.ts.toDate()).toLocaleDateString('fr-FR', {day:'numeric', month:'short'});
+                if(!maxPerDay[d] || log.weight > maxPerDay[d]) maxPerDay[d] = log.weight;
+            });
+
+            const sortedDates = Object.keys(maxPerDay).reverse();
+            const dataWeights = sortedDates.map(d => maxPerDay[d]);
+
+            if (chartInstance) chartInstance.destroy();
+
+            chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: sortedDates,
+                    datasets: [{
+                        label: 'Max Poids (kg)',
+                        data: dataWeights,
+                        borderColor: '#38bdf8',
+                        backgroundColor: 'rgba(56,189,248,0.1)',
+                        borderWidth: 3,
+                        pointRadius: 5,
+                        pointBackgroundColor: '#0ea5e9',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { grid: { color: '#1e293b' }, ticks: { color: '#94a3b8' } },
+                        x: { grid: { display: false }, ticks: { color: '#94a3b8' } }
+                    }
+                }
+            });
+        };
+    </script>
+</body>
+</html>
