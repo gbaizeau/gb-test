@@ -141,7 +141,8 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
         import { getFirestore, collection, doc, setDoc, getDoc, addDoc, onSnapshot, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
-        import { getAuth, GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+        // Ajout de setPersistence et browserLocalPersistence
+        import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyBvtimU38lzUYpZhHkkt4WNPwlI-SjGvpM",
@@ -157,6 +158,9 @@
         const db = getFirestore(app);
         const auth = getAuth(app);
         const provider = new GoogleAuthProvider();
+        
+        // Force Google à demander le compte (évite certains bugs de cache)
+        provider.setCustomParameters({ prompt: 'select_account' });
 
         let currentUser = null;
         let isMimi = false;
@@ -164,17 +168,6 @@
         let customExercises = [];
         let currentPlannedExercises = [];
         let chartInstance = null;
-
-        // --- 🚨 RÉCUPÉRATION DE LA CONNEXION APRÈS REDIRECTION ---
-        getRedirectResult(auth).then((result) => {
-            if (result) {
-                console.log("Retour de connexion Google réussi !");
-            }
-        }).catch((error) => {
-            console.error("Erreur après redirection :", error);
-            alert("Erreur d'authentification : " + error.message);
-        });
-        // ---------------------------------------------------------
 
         const baseExercises = [
             "Dead Hangs", "Scapular Pull-ups", "Lat Pulldown", "Biceps Curls", "Australian Rows",
@@ -190,11 +183,14 @@
 
         document.getElementById('plan-date').value = getLocalDateStr();
 
-        document.getElementById('btn-login').addEventListener('click', () => {
+        // 🚨 ON FORCE LA PERSISTENCE LOCALE AVANT DE SE CONNECTER
+        document.getElementById('btn-login').addEventListener('click', async () => {
             try {
-                signInWithRedirect(auth, provider);
+                await setPersistence(auth, browserLocalPersistence);
+                await signInWithPopup(auth, provider);
             } catch (error) {
-                alert("Impossible de lancer Google : " + error.message);
+                console.error(error);
+                alert("Erreur de connexion : " + error.message);
             }
         });
 
