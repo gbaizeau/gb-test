@@ -12,6 +12,9 @@
         .tab-btn.active { border-bottom: 2px solid #38bdf8; color: #38bdf8; }
         .input-gym { background: #1e293b; border: 1px solid #334155; color: white; width: 100%; border-radius: 0.75rem; padding: 0.75rem; font-size: 1.25rem; font-weight: 800; text-align: center; }
         .input-gym:focus { outline: none; border-color: #38bdf8; }
+        /* Pour cacher la scrollbar des onglets sur mobile */
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
 </head>
 <body class="pb-24">
@@ -82,27 +85,44 @@
         <!-- TAB 2: PLANNING -->
         <div id="view-plan" class="hidden">
             <div class="bg-slate-800 p-5 rounded-[2rem] shadow-lg border border-slate-700">
-                <h2 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Gérer le Planning</h2>
                 
-                <input type="date" id="plan-date" onchange="loadPlannedWorkout()" class="w-full bg-slate-900 border border-slate-700 text-white rounded-xl p-3 mb-6 font-bold outline-none focus:border-sky-500">
-                
-                <div class="mb-4">
-                    <h3 class="text-xs font-bold text-slate-300 mb-2">Exercices prévus ce jour :</h3>
-                    <div id="planned-exercises-list" class="space-y-2 mb-4 bg-slate-900 p-3 rounded-xl min-h-[60px] border border-slate-700"></div>
+                <!-- Semaine Navigation -->
+                <div class="flex justify-between items-center mb-6 border-b border-slate-700 pb-4">
+                    <button onclick="changeWeek(-1)" class="bg-slate-700 px-3 py-1 rounded-lg font-bold">⬅️</button>
+                    <h2 id="week-label" class="text-xs font-black text-slate-300 uppercase tracking-widest">Semaine</h2>
+                    <button onclick="changeWeek(1)" class="bg-slate-700 px-3 py-1 rounded-lg font-bold">➡️</button>
                 </div>
 
-                <div class="flex space-x-2 mb-6">
-                    <select id="add-ex-select" class="flex-1 bg-slate-900 border border-slate-700 text-white rounded-xl p-3 font-bold outline-none"></select>
-                    <button onclick="addExerciseToPlan()" class="bg-sky-500 text-white px-4 rounded-xl font-black">+</button>
+                <!-- Grille des Jours -->
+                <div id="week-grid" class="grid grid-cols-2 gap-3 mb-6">
+                    <!-- Généré en JS -->
                 </div>
 
-                <div class="border-t border-slate-700 pt-4">
-                    <h3 class="text-xs font-bold text-slate-400 mb-2">L'exercice n'existe pas ?</h3>
-                    <div class="flex space-x-2">
-                        <input type="text" id="new-ex-name" placeholder="Ex: Hip Thrust" class="flex-1 bg-slate-900 border border-slate-700 text-white rounded-xl p-3 font-bold outline-none">
-                        <button onclick="createNewExercise()" class="bg-slate-700 text-white px-4 rounded-xl font-bold text-sm">Créer</button>
+                <!-- Éditeur d'un jour spécifique (Caché par défaut) -->
+                <div id="day-editor" class="hidden bg-slate-900 border border-slate-700 p-4 rounded-xl relative">
+                    <button onclick="closeDayEditor()" class="absolute top-2 right-3 text-slate-400 font-black text-xl hover:text-white">&times;</button>
+                    
+                    <h3 id="editor-date-label" class="text-sky-400 font-black text-sm mb-4">Lundi 12 Octobre</h3>
+                    
+                    <div class="mb-4">
+                        <div id="planned-exercises-list" class="space-y-2 mb-4 min-h-[40px]"></div>
+                    </div>
+
+                    <div class="flex space-x-2 mb-6">
+                        <select id="add-ex-select" class="flex-1 bg-slate-800 border border-slate-600 text-white rounded-xl p-3 font-bold outline-none text-sm"></select>
+                        <button onclick="addExerciseToPlan()" class="bg-sky-500 text-white px-4 rounded-xl font-black">+</button>
+                    </div>
+
+                    <!-- Décaler la séance -->
+                    <div class="border-t border-slate-700 pt-4 mt-2">
+                        <label class="block text-[10px] font-black text-slate-400 uppercase mb-2">Décaler cette séance au :</label>
+                        <div class="flex space-x-2">
+                            <input type="date" id="shift-date" class="flex-1 bg-slate-800 border border-slate-600 text-white rounded-xl p-2 text-sm font-bold outline-none">
+                            <button onclick="shiftWorkout()" class="bg-orange-500 text-white px-3 rounded-xl font-bold text-xs uppercase tracking-wider">Décaler</button>
+                        </div>
                     </div>
                 </div>
+
             </div>
         </div>
 
@@ -140,8 +160,7 @@
     <!-- Firebase & Logic -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-        import { getFirestore, collection, doc, setDoc, getDoc, addDoc, onSnapshot, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
-        // Ajout de setPersistence et browserLocalPersistence
+        import { getFirestore, collection, doc, setDoc, getDoc, addDoc, deleteDoc, onSnapshot, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
         import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 
         const firebaseConfig = {
@@ -159,31 +178,41 @@
         const auth = getAuth(app);
         const provider = new GoogleAuthProvider();
         
-        // Force Google à demander le compte (évite certains bugs de cache)
         provider.setCustomParameters({ prompt: 'select_account' });
 
         let currentUser = null;
         let isMimi = false;
         let allLogs = [];
         let customExercises = [];
-        let currentPlannedExercises = [];
+        
+        // Planning state
+        let currentWeekStartDate = new Date();
+        let weekPlansData = {}; // Cache for the rendered week
+        let selectedPlanDateStr = null; // Currently editing day
         let chartInstance = null;
 
-        const baseExercises = [
-            "Dead Hangs", "Scapular Pull-ups", "Lat Pulldown", "Biceps Curls", "Australian Rows",
-            "Dumbbell Bench Press", "Shoulder Press", "Leg Extension", "Leg Curl", "Triceps Pushdown",
-            "Banded Pull-ups", "Gainage", "Elastique Fessiers", "Goblet Squats", "Pompes", 
-            "Bulgarian Split Squats", "Lateral Raises", "Eccentric Pull-ups", "Deadlifts", "Dips"
-        ];
+        // --- CATÉGORIES D'EXERCICES ---
+        const categorizedExercises = {
+            "🦵 Legs": ["Goblet Squats", "Bulgarian Split Squats", "Leg Extension", "Leg Curl", "Deadlifts"],
+            "🔙 Back & Biceps": ["Dead Hangs", "Scapular Pull-ups", "Lat Pulldown", "Biceps Curls", "Australian Rows", "Banded Pull-ups", "Eccentric Pull-ups"],
+            "🦍 Upper Push": ["Dumbbell Bench Press", "Shoulder Press", "Triceps Pushdown", "Pompes", "Lateral Raises", "Dips"],
+            "🍫 Abs & Core": ["Gainage", "Elastique Fessiers"]
+        };
 
-        const getLocalDateStr = (d = new Date()) => {
+        const getLocalDateStr = (d) => {
             const offset = d.getTimezoneOffset() * 60000;
             return (new Date(d - offset)).toISOString().split('T')[0];
         };
 
-        document.getElementById('plan-date').value = getLocalDateStr();
+        // Trouve le Lundi de la semaine en cours
+        function getMonday(d) {
+            d = new Date(d);
+            var day = d.getDay(), diff = d.getDate() - day + (day == 0 ? -6:1); // adjust when day is sunday
+            return new Date(d.setDate(diff));
+        }
+        currentWeekStartDate = getMonday(new Date());
 
-        // 🚨 ON FORCE LA PERSISTENCE LOCALE AVANT DE SE CONNECTER
+        // --- AUTHENTIFICATION ---
         document.getElementById('btn-login').addEventListener('click', async () => {
             try {
                 await setPersistence(auth, browserLocalPersistence);
@@ -217,6 +246,7 @@
             }
         });
 
+        // --- TABS ---
         window.switchTab = (tab) => {
             ['workout', 'plan', 'progress', 'rehab'].forEach(t => {
                 document.getElementById(`view-${t}`).classList.add('hidden');
@@ -225,7 +255,7 @@
             document.getElementById(`view-${tab}`).classList.remove('hidden');
             document.getElementById(`tab-${tab}`).classList.add('active');
             if(tab === 'progress') renderChart();
-            if(tab === 'plan') window.loadPlannedWorkout();
+            if(tab === 'plan') loadWeekView();
         };
 
         function initApp() {
@@ -246,56 +276,143 @@
             loadTodayWorkout();
         }
 
-        function getAllExercises() {
-            const all = [...new Set([...baseExercises, ...customExercises])];
-            return all.sort();
-        }
-
+        // --- GÉNÉRATION DES MENUS (AVEC CATÉGORIES) ---
         function updateExerciseDropdowns() {
-            const allEx = getAllExercises();
             const planSelect = document.getElementById('add-ex-select');
             const chartSelect = document.getElementById('chart-exercise-select');
-            
             const currentPlanVal = planSelect.value;
             const currentChartVal = chartSelect.value;
 
             planSelect.innerHTML = ''; chartSelect.innerHTML = '';
             
-            allEx.forEach(ex => {
-                planSelect.add(new Option(ex, ex));
-                chartSelect.add(new Option(ex, ex));
-            });
+            // Ajouter les catégories standard
+            for (const [category, exercises] of Object.entries(categorizedExercises)) {
+                let group1 = document.createElement('optgroup'); group1.label = category;
+                let group2 = document.createElement('optgroup'); group2.label = category;
+                exercises.sort().forEach(ex => {
+                    group1.appendChild(new Option(ex, ex));
+                    group2.appendChild(new Option(ex, ex));
+                });
+                planSelect.appendChild(group1);
+                chartSelect.appendChild(group2);
+            }
 
-            if(currentPlanVal && allEx.includes(currentPlanVal)) planSelect.value = currentPlanVal;
-            if(currentChartVal && allEx.includes(currentChartVal)) chartSelect.value = currentChartVal;
+            // Ajouter les exercices custom s'il y en a
+            if(customExercises.length > 0) {
+                let groupCustom1 = document.createElement('optgroup'); groupCustom1.label = "🛠️ Custom";
+                let groupCustom2 = document.createElement('optgroup'); groupCustom2.label = "🛠️ Custom";
+                customExercises.sort().forEach(ex => {
+                    groupCustom1.appendChild(new Option(ex, ex));
+                    groupCustom2.appendChild(new Option(ex, ex));
+                });
+                planSelect.appendChild(groupCustom1);
+                chartSelect.appendChild(groupCustom2);
+            }
+
+            // Restore selection if it still exists
+            if(currentPlanVal) planSelect.value = currentPlanVal;
+            if(currentChartVal) chartSelect.value = currentChartVal;
         }
 
-        window.loadPlannedWorkout = async () => {
-            const dateStr = document.getElementById('plan-date').value;
-            if(!dateStr) return;
-            
-            const docRef = doc(db, `users/${currentUser.uid}/plannedWorkouts`, dateStr);
-            const docSnap = await getDoc(docRef);
-            
-            if (docSnap.exists() && docSnap.data().exercises) {
-                currentPlannedExercises = docSnap.data().exercises;
-            } else {
-                currentPlannedExercises = [];
-            }
-            renderPlannedList();
+        // --- PLANNING : VUE SEMAINE ---
+        window.changeWeek = (offset) => {
+            currentWeekStartDate.setDate(currentWeekStartDate.getDate() + (offset * 7));
+            closeDayEditor();
+            loadWeekView();
         };
 
-        function renderPlannedList() {
+        window.loadWeekView = async () => {
+            const weekEnd = new Date(currentWeekStartDate);
+            weekEnd.setDate(weekEnd.getDate() + 6);
+            
+            const startStr = currentWeekStartDate.toLocaleDateString('fr-FR', {day: 'numeric', month: 'short'});
+            const endStr = weekEnd.toLocaleDateString('fr-FR', {day: 'numeric', month: 'short'});
+            document.getElementById('week-label').innerText = `${startStr} - ${endStr}`;
+
+            const grid = document.getElementById('week-grid');
+            grid.innerHTML = '<div class="col-span-2 text-center text-sm text-slate-500 py-4">Chargement...</div>';
+
+            const days = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"];
+            weekPlansData = {};
+
+            // Fetch the 7 days
+            for(let i = 0; i < 7; i++) {
+                let d = new Date(currentWeekStartDate);
+                d.setDate(d.getDate() + i);
+                let dStr = getLocalDateStr(d);
+                
+                const docSnap = await getDoc(doc(db, `users/${currentUser.uid}/plannedWorkouts`, dStr));
+                if (docSnap.exists() && docSnap.data().exercises) {
+                    weekPlansData[dStr] = docSnap.data().exercises;
+                } else {
+                    weekPlansData[dStr] = [];
+                }
+            }
+
+            // Render grid
+            grid.innerHTML = '';
+            const todayStr = getLocalDateStr(new Date());
+
+            for(let i = 0; i < 7; i++) {
+                let d = new Date(currentWeekStartDate);
+                d.setDate(d.getDate() + i);
+                let dStr = getLocalDateStr(d);
+                
+                const nbEx = weekPlansData[dStr].length;
+                const isToday = (dStr === todayStr);
+                
+                const card = document.createElement('div');
+                card.onclick = () => openDayEditor(dStr, days[i], d.getDate());
+                card.className = `p-3 rounded-xl cursor-pointer transition flex flex-col items-center justify-center text-center
+                    ${isToday ? 'bg-sky-900 border-2 border-sky-500' : 'bg-slate-900 border border-slate-700 hover:bg-slate-700'}`;
+                
+                card.innerHTML = `
+                    <span class="text-xs font-black ${isToday ? 'text-sky-300' : 'text-slate-400'} uppercase">${days[i]}</span>
+                    <span class="text-lg font-black text-white my-1">${d.getDate()}</span>
+                    <span class="text-[10px] px-2 py-0.5 rounded-full font-bold ${nbEx > 0 ? 'bg-sky-500/20 text-sky-400' : 'bg-slate-800 text-slate-500'}">
+                        ${nbEx > 0 ? nbEx + ' exos' : 'Repos'}
+                    </span>
+                `;
+                
+                // Dimanche prend toute la largeur
+                if(i === 6) card.classList.add("col-span-2");
+                
+                grid.appendChild(card);
+            }
+        };
+
+        // --- PLANNING : ÉDITER UN JOUR ---
+        window.openDayEditor = (dateStr, dayName, dayNum) => {
+            selectedPlanDateStr = dateStr;
+            document.getElementById('editor-date-label').innerText = `Édition : ${dayName} ${dayNum}`;
+            document.getElementById('shift-date').value = dateStr; // Default shift date is same day (safety)
+            document.getElementById('day-editor').classList.remove('hidden');
+            
+            // Scroll down a bit on mobile
+            setTimeout(() => document.getElementById('day-editor').scrollIntoView({behavior: "smooth", block: "nearest"}), 100);
+            
+            renderEditorList();
+        };
+
+        window.closeDayEditor = () => {
+            document.getElementById('day-editor').classList.add('hidden');
+            selectedPlanDateStr = null;
+        };
+
+        function renderEditorList() {
             const container = document.getElementById('planned-exercises-list');
             container.innerHTML = '';
-            if(currentPlannedExercises.length === 0) {
+            
+            const exos = weekPlansData[selectedPlanDateStr] || [];
+            
+            if(exos.length === 0) {
                 container.innerHTML = '<span class="text-slate-500 text-xs italic">Aucun exercice prévu.</span>';
             } else {
-                currentPlannedExercises.forEach((ex, idx) => {
+                exos.forEach((ex, idx) => {
                     const div = document.createElement('div');
-                    div.className = "flex justify-between items-center bg-slate-800 p-2 rounded";
+                    div.className = "flex justify-between items-center bg-slate-800 p-2 rounded border border-slate-700";
                     div.innerHTML = `
-                        <span class="text-sm font-bold text-sky-400">${ex}</span>
+                        <span class="text-sm font-bold text-slate-200">${ex}</span>
                         <button onclick="removeExerciseFromPlan(${idx})" class="text-slate-500 hover:text-red-400 text-xl leading-none">&times;</button>
                     `;
                     container.appendChild(div);
@@ -305,37 +422,67 @@
 
         window.addExerciseToPlan = async () => {
             const ex = document.getElementById('add-ex-select').value;
-            if(!ex) return;
-            currentPlannedExercises.push(ex);
-            await savePlanToDB();
+            if(!ex || !selectedPlanDateStr) return;
+            
+            if(!weekPlansData[selectedPlanDateStr]) weekPlansData[selectedPlanDateStr] = [];
+            weekPlansData[selectedPlanDateStr].push(ex);
+            
+            await savePlanToDB(selectedPlanDateStr, weekPlansData[selectedPlanDateStr]);
+            renderEditorList();
+            loadWeekView(); // refresh bubbles
         };
 
         window.removeExerciseFromPlan = async (idx) => {
-            currentPlannedExercises.splice(idx, 1);
-            await savePlanToDB();
+            weekPlansData[selectedPlanDateStr].splice(idx, 1);
+            await savePlanToDB(selectedPlanDateStr, weekPlansData[selectedPlanDateStr]);
+            renderEditorList();
+            loadWeekView();
         };
 
-        async function savePlanToDB() {
-            const dateStr = document.getElementById('plan-date').value;
+        async function savePlanToDB(dateStr, exosArr) {
             await setDoc(doc(db, `users/${currentUser.uid}/plannedWorkouts`, dateStr), {
-                exercises: currentPlannedExercises
+                exercises: exosArr
             }, { merge: true });
-            renderPlannedList();
             
-            if(dateStr === getLocalDateStr()) {
-                loadTodayWorkout();
-            }
+            if(dateStr === getLocalDateStr()) loadTodayWorkout();
         }
 
-        window.createNewExercise = async () => {
-            const name = document.getElementById('new-ex-name').value.trim();
-            if(!name) return;
+        // --- PLANNING : DÉCALER LA SÉANCE ---
+        window.shiftWorkout = async () => {
+            const targetDateStr = document.getElementById('shift-date').value;
+            if(!targetDateStr || targetDateStr === selectedPlanDateStr) return;
             
-            await addDoc(collection(db, `users/${currentUser.uid}/customExercises`), { name });
-            document.getElementById('new-ex-name').value = '';
-            alert("Exercice créé et ajouté à la liste !");
+            const exosToMove = weekPlansData[selectedPlanDateStr] || [];
+            if(exosToMove.length === 0) return alert("Rien à décaler ce jour-là.");
+
+            if(confirm(`Déplacer ces ${exosToMove.length} exercices au ${targetDateStr} ?`)) {
+                try {
+                    // 1. Ajouter à la nouvelle date
+                    await setDoc(doc(db, `users/${currentUser.uid}/plannedWorkouts`, targetDateStr), {
+                        exercises: exosToMove
+                    }, { merge: true });
+                    
+                    // 2. Supprimer de l'ancienne date
+                    await deleteDoc(doc(db, `users/${currentUser.uid}/plannedWorkouts`, selectedPlanDateStr));
+                    
+                    weekPlansData[selectedPlanDateStr] = []; // clear local cache
+                    closeDayEditor();
+                    loadWeekView(); // reload ui
+                    
+                    if(selectedPlanDateStr === getLocalDateStr() || targetDateStr === getLocalDateStr()) {
+                        loadTodayWorkout();
+                    }
+                    
+                    alert("Séance décalée avec succès !");
+                } catch(e) {
+                    console.error(e);
+                    alert("Erreur lors du décalage.");
+                }
+            }
         };
 
+
+        // --- WORKOUT TAB ---
         async function loadTodayWorkout() {
             const dateStr = getLocalDateStr();
             const docRef = doc(db, `users/${currentUser.uid}/plannedWorkouts`, dateStr);
@@ -355,8 +502,22 @@
                 document.getElementById('workout-status').innerText = "SÉANCE LIBRE";
                 document.getElementById('workout-status').className = "text-[10px] bg-slate-700 text-sky-400 px-2 py-1 rounded font-bold";
                 
-                const allEx = getAllExercises();
-                allEx.forEach(ex => exSelect.add(new Option(ex, ex)));
+                // Insert categorized dropdown for free mode
+                const tempSelect = document.createElement('select');
+                tempSelect.id = 'temp';
+                document.body.appendChild(tempSelect); // dummy
+                // reuse the same logic
+                for (const [category, exercises] of Object.entries(categorizedExercises)) {
+                    let group = document.createElement('optgroup'); group.label = category;
+                    exercises.sort().forEach(ex => group.appendChild(new Option(ex, ex)));
+                    exSelect.appendChild(group);
+                }
+                if(customExercises.length > 0) {
+                    let group = document.createElement('optgroup'); group.label = "🛠️ Custom";
+                    customExercises.sort().forEach(ex => group.appendChild(new Option(ex, ex)));
+                    exSelect.appendChild(group);
+                }
+                document.body.removeChild(tempSelect);
             }
             window.checkLastPerformance();
         }
@@ -433,6 +594,7 @@
         window.renderChart = () => {
             const ctx = document.getElementById('progression-chart').getContext('2d');
             const selectedEx = document.getElementById('chart-exercise-select').value;
+            if(!selectedEx) return;
             
             const exLogs = allLogs.filter(l => l.exercise === selectedEx && l.ts);
             
