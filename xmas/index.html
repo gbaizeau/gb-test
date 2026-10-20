@@ -12,7 +12,6 @@
         .tab-btn.active { border-bottom: 2px solid #38bdf8; color: #38bdf8; }
         .input-gym { background: #1e293b; border: 1px solid #334155; color: white; width: 100%; border-radius: 0.75rem; padding: 0.75rem; font-size: 1.25rem; font-weight: 800; text-align: center; }
         .input-gym:focus { outline: none; border-color: #38bdf8; }
-        /* Pour cacher la scrollbar des onglets sur mobile */
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
@@ -86,6 +85,12 @@
         <div id="view-plan" class="hidden">
             <div class="bg-slate-800 p-5 rounded-[2rem] shadow-lg border border-slate-700">
                 
+                <!-- IMPORT BUTTON (MIMI ONLY) -->
+                <div id="mimi-import-section" class="hidden mb-6 p-4 bg-emerald-900/30 border border-emerald-500/30 rounded-xl text-center">
+                    <p class="text-xs text-emerald-400 mb-3">Coucou Amélie ! J'ai pré-chargé tes 5 jours d'entraînement. Clique ici pour générer tes 9 semaines d'un coup.</p>
+                    <button onclick="importMimiPlan()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg font-bold text-sm w-full transition">📥 Importer mon Plan (9 Semaines)</button>
+                </div>
+
                 <!-- Semaine Navigation -->
                 <div class="flex justify-between items-center mb-6 border-b border-slate-700 pb-4">
                     <button onclick="changeWeek(-1)" class="bg-slate-700 px-3 py-1 rounded-lg font-bold">⬅️</button>
@@ -187,16 +192,59 @@
         
         // Planning state
         let currentWeekStartDate = new Date();
-        let weekPlansData = {}; // Cache for the rendered week
-        let selectedPlanDateStr = null; // Currently editing day
+        let weekPlansData = {}; 
+        let selectedPlanDateStr = null; 
         let chartInstance = null;
+
+        // --- PLAN DE MIMI (Extrait du fichier Excel) ---
+        const mimiPlanData = [
+            // Lundi : Back & biceps
+            ["Chest-supported row", "Seated lat pulldown", "Seated incline dumbbell curls", "Seated hammer curls", "Scapular pull-ups / dead hangs", "Assisted pull-ups / negatives", "Extra pulldown variation"],
+            // Mardi : Chest, shoulders & triceps
+            ["Seated chest press", "Lying chest fly", "Seated DB shoulder press", "Seated lateral raises", "Seated overhead triceps extension", "Seated triceps pushdown", "Supine dead bug", "Side plank"],
+            // Mercredi : Lower Body + Core (Modified)
+            ["Banded donkey kicks", "Side-lying clamshells", "Prone leg curl machine", "Seated leg extension", "Seated hip abductor machine", "Seated hip adductor machine", "Single-leg glute bridge", "Supine dead bug", "Bird dog", "Tabletop toe taps", "Side plank"],
+            // Jeudi : Mixed back, shoulders & arms
+            ["Seated neutral-grip lat pulldown", "Chest-supported row (diff grip)", "Straight-arm cable pulldown", "Seated lateral raises", "Chest-supported rear-delt fly", "Seated biceps curls", "Seated triceps extensions", "Pull-up negatives / push-ups", "Arnold press", "Upright row", "Front raises", "Around-the-worlds"],
+            // Vendredi : Core / Pilates
+            ["Supine dead bugs", "Modified Pilates hundred", "Supine abdominal curl", "Supine abdominal bracing", "Tabletop toe taps", "Side planks / bird dogs", "Bycicle twists", "Hanging knee raises", "DB deadbug", "Flutter kicks", "Side plank"]
+        ];
+
+        window.importMimiPlan = async () => {
+            if(!confirm("Importer les 9 semaines du plan d'entraînement ?")) return;
+            
+            // Trouver le lundi de cette semaine
+            let d = new Date();
+            let day = d.getDay();
+            let diff = d.getDate() - day + (day === 0 ? -6 : 1);
+            let startMonday = new Date(d.setDate(diff));
+            
+            let count = 0;
+            for(let week = 0; week < 9; week++) {
+                for(let dayIndex = 0; dayIndex < 5; dayIndex++) {
+                    let workoutDate = new Date(startMonday);
+                    workoutDate.setDate(workoutDate.getDate() + (week * 7) + dayIndex);
+                    
+                    let dateStr = getLocalDateStr(workoutDate);
+                    let exercises = mimiPlanData[dayIndex];
+                    
+                    await setDoc(doc(db, `users/${currentUser.uid}/plannedWorkouts`, dateStr), {
+                        exercises: exercises
+                    }, { merge: true });
+                    count++;
+                }
+            }
+            alert(`Succès ! ${count} séances (9 semaines) ont été générées et sauvegardées.`);
+            document.getElementById('mimi-import-section').classList.add('hidden');
+            loadWeekView(); // Rafraichir la vue
+        };
 
         // --- CATÉGORIES D'EXERCICES ---
         const categorizedExercises = {
-            "🦵 Legs": ["Goblet Squats", "Bulgarian Split Squats", "Leg Extension", "Leg Curl", "Deadlifts"],
-            "🔙 Back & Biceps": ["Dead Hangs", "Scapular Pull-ups", "Lat Pulldown", "Biceps Curls", "Australian Rows", "Banded Pull-ups", "Eccentric Pull-ups"],
-            "🦍 Upper Push": ["Dumbbell Bench Press", "Shoulder Press", "Triceps Pushdown", "Pompes", "Lateral Raises", "Dips"],
-            "🍫 Abs & Core": ["Gainage", "Elastique Fessiers"]
+            "🦵 Legs": ["Goblet Squats", "Bulgarian Split Squats", "Leg Extension", "Leg Curl", "Deadlifts", "Banded donkey kicks", "Side-lying clamshells", "Prone leg curl machine", "Seated leg extension", "Seated hip abductor machine", "Seated hip adductor machine", "Single-leg glute bridge"],
+            "🔙 Back & Biceps": ["Dead Hangs", "Scapular Pull-ups", "Lat Pulldown", "Biceps Curls", "Australian Rows", "Banded Pull-ups", "Eccentric Pull-ups", "Chest-supported row", "Seated lat pulldown", "Seated incline dumbbell curls", "Seated hammer curls", "Assisted pull-ups / negatives", "Seated neutral-grip lat pulldown", "Straight-arm cable pulldown", "Seated biceps curls"],
+            "🦍 Upper Push": ["Dumbbell Bench Press", "Shoulder Press", "Triceps Pushdown", "Pompes", "Lateral Raises", "Dips", "Seated chest press", "Lying chest fly", "Seated DB shoulder press", "Seated overhead triceps extension", "Seated triceps pushdown", "Chest-supported rear-delt fly", "Seated triceps extensions", "Pull-up negatives / push-ups", "Arnold press", "Upright row", "Front raises", "Around-the-worlds"],
+            "🍫 Abs & Core": ["Gainage", "Elastique Fessiers", "Supine dead bug", "Side plank", "Bird dog", "Tabletop toe taps", "Supine dead bugs", "Modified Pilates hundred", "Supine abdominal curl", "Supine abdominal bracing", "Side planks / bird dogs", "Bycicle twists", "Hanging knee raises", "DB deadbug", "Flutter kicks"]
         };
 
         const getLocalDateStr = (d) => {
@@ -207,7 +255,7 @@
         // Trouve le Lundi de la semaine en cours
         function getMonday(d) {
             d = new Date(d);
-            var day = d.getDay(), diff = d.getDate() - day + (day == 0 ? -6:1); // adjust when day is sunday
+            var day = d.getDay(), diff = d.getDate() - day + (day == 0 ? -6:1);
             return new Date(d.setDate(diff));
         }
         currentWeekStartDate = getMonday(new Date());
@@ -228,14 +276,21 @@
         onAuthStateChanged(auth, (user) => {
             if (user) {
                 currentUser = user;
-                const name = user.displayName ? user.displayName.toLowerCase() : "";
-                isMimi = name.includes('mimi'); 
+                
+                // --- CORRECTION DU PRÉNOM (Retire les accents, vérifie amelie ou mimi) ---
+                const rawName = user.displayName ? user.displayName.toLowerCase() : "";
+                const cleanName = rawName.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                isMimi = cleanName.includes('mimi') || cleanName.includes('amelie'); 
                 
                 document.getElementById('user-name').innerText = user.displayName ? user.displayName.split(' ')[0] : "Sportif";
                 document.getElementById('btn-login').classList.add('hidden');
                 document.getElementById('user-info').classList.remove('hidden');
                 document.getElementById('app-content').classList.remove('hidden');
-                if(isMimi) document.getElementById('tab-rehab').classList.remove('hidden');
+                
+                if(isMimi) {
+                    document.getElementById('tab-rehab').classList.remove('hidden');
+                    document.getElementById('mimi-import-section').classList.remove('hidden');
+                }
                 
                 initApp();
             } else {
@@ -276,7 +331,7 @@
             loadTodayWorkout();
         }
 
-        // --- GÉNÉRATION DES MENUS (AVEC CATÉGORIES) ---
+        // --- GÉNÉRATION DES MENUS ---
         function updateExerciseDropdowns() {
             const planSelect = document.getElementById('add-ex-select');
             const chartSelect = document.getElementById('chart-exercise-select');
@@ -285,11 +340,12 @@
 
             planSelect.innerHTML = ''; chartSelect.innerHTML = '';
             
-            // Ajouter les catégories standard
             for (const [category, exercises] of Object.entries(categorizedExercises)) {
                 let group1 = document.createElement('optgroup'); group1.label = category;
                 let group2 = document.createElement('optgroup'); group2.label = category;
-                exercises.sort().forEach(ex => {
+                // Filtrer les doublons potentiels et trier
+                let uniqueEx = [...new Set(exercises)].sort();
+                uniqueEx.forEach(ex => {
                     group1.appendChild(new Option(ex, ex));
                     group2.appendChild(new Option(ex, ex));
                 });
@@ -297,7 +353,6 @@
                 chartSelect.appendChild(group2);
             }
 
-            // Ajouter les exercices custom s'il y en a
             if(customExercises.length > 0) {
                 let groupCustom1 = document.createElement('optgroup'); groupCustom1.label = "🛠️ Custom";
                 let groupCustom2 = document.createElement('optgroup'); groupCustom2.label = "🛠️ Custom";
@@ -309,7 +364,6 @@
                 chartSelect.appendChild(groupCustom2);
             }
 
-            // Restore selection if it still exists
             if(currentPlanVal) planSelect.value = currentPlanVal;
             if(currentChartVal) chartSelect.value = currentChartVal;
         }
@@ -335,7 +389,6 @@
             const days = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"];
             weekPlansData = {};
 
-            // Fetch the 7 days
             for(let i = 0; i < 7; i++) {
                 let d = new Date(currentWeekStartDate);
                 d.setDate(d.getDate() + i);
@@ -349,7 +402,6 @@
                 }
             }
 
-            // Render grid
             grid.innerHTML = '';
             const todayStr = getLocalDateStr(new Date());
 
@@ -374,9 +426,7 @@
                     </span>
                 `;
                 
-                // Dimanche prend toute la largeur
                 if(i === 6) card.classList.add("col-span-2");
-                
                 grid.appendChild(card);
             }
         };
@@ -385,10 +435,9 @@
         window.openDayEditor = (dateStr, dayName, dayNum) => {
             selectedPlanDateStr = dateStr;
             document.getElementById('editor-date-label').innerText = `Édition : ${dayName} ${dayNum}`;
-            document.getElementById('shift-date').value = dateStr; // Default shift date is same day (safety)
+            document.getElementById('shift-date').value = dateStr; 
             document.getElementById('day-editor').classList.remove('hidden');
             
-            // Scroll down a bit on mobile
             setTimeout(() => document.getElementById('day-editor').scrollIntoView({behavior: "smooth", block: "nearest"}), 100);
             
             renderEditorList();
@@ -429,7 +478,7 @@
             
             await savePlanToDB(selectedPlanDateStr, weekPlansData[selectedPlanDateStr]);
             renderEditorList();
-            loadWeekView(); // refresh bubbles
+            loadWeekView(); 
         };
 
         window.removeExerciseFromPlan = async (idx) => {
@@ -457,17 +506,15 @@
 
             if(confirm(`Déplacer ces ${exosToMove.length} exercices au ${targetDateStr} ?`)) {
                 try {
-                    // 1. Ajouter à la nouvelle date
                     await setDoc(doc(db, `users/${currentUser.uid}/plannedWorkouts`, targetDateStr), {
                         exercises: exosToMove
                     }, { merge: true });
                     
-                    // 2. Supprimer de l'ancienne date
                     await deleteDoc(doc(db, `users/${currentUser.uid}/plannedWorkouts`, selectedPlanDateStr));
                     
-                    weekPlansData[selectedPlanDateStr] = []; // clear local cache
+                    weekPlansData[selectedPlanDateStr] = []; 
                     closeDayEditor();
-                    loadWeekView(); // reload ui
+                    loadWeekView(); 
                     
                     if(selectedPlanDateStr === getLocalDateStr() || targetDateStr === getLocalDateStr()) {
                         loadTodayWorkout();
@@ -502,14 +549,11 @@
                 document.getElementById('workout-status').innerText = "SÉANCE LIBRE";
                 document.getElementById('workout-status').className = "text-[10px] bg-slate-700 text-sky-400 px-2 py-1 rounded font-bold";
                 
-                // Insert categorized dropdown for free mode
                 const tempSelect = document.createElement('select');
-                tempSelect.id = 'temp';
-                document.body.appendChild(tempSelect); // dummy
-                // reuse the same logic
                 for (const [category, exercises] of Object.entries(categorizedExercises)) {
                     let group = document.createElement('optgroup'); group.label = category;
-                    exercises.sort().forEach(ex => group.appendChild(new Option(ex, ex)));
+                    let uniqueEx = [...new Set(exercises)].sort();
+                    uniqueEx.forEach(ex => group.appendChild(new Option(ex, ex)));
                     exSelect.appendChild(group);
                 }
                 if(customExercises.length > 0) {
@@ -517,7 +561,6 @@
                     customExercises.sort().forEach(ex => group.appendChild(new Option(ex, ex)));
                     exSelect.appendChild(group);
                 }
-                document.body.removeChild(tempSelect);
             }
             window.checkLastPerformance();
         }
