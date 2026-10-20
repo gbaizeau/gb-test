@@ -141,9 +141,8 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
         import { getFirestore, collection, doc, setDoc, getDoc, addDoc, onSnapshot, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
-        import { getAuth, GoogleAuthProvider, signInWithRedirect, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+        import { getAuth, GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 
-        // Ta vraie configuration
         const firebaseConfig = {
             apiKey: "AIzaSyBvtimU38lzUYpZhHkkt4WNPwlI-SjGvpM",
             authDomain: "gymxmas2026.firebaseapp.com",
@@ -166,6 +165,17 @@
         let currentPlannedExercises = [];
         let chartInstance = null;
 
+        // --- 🚨 RÉCUPÉRATION DE LA CONNEXION APRÈS REDIRECTION ---
+        getRedirectResult(auth).then((result) => {
+            if (result) {
+                console.log("Retour de connexion Google réussi !");
+            }
+        }).catch((error) => {
+            console.error("Erreur après redirection :", error);
+            alert("Erreur d'authentification : " + error.message);
+        });
+        // ---------------------------------------------------------
+
         const baseExercises = [
             "Dead Hangs", "Scapular Pull-ups", "Lat Pulldown", "Biceps Curls", "Australian Rows",
             "Dumbbell Bench Press", "Shoulder Press", "Leg Extension", "Leg Curl", "Triceps Pushdown",
@@ -180,13 +190,11 @@
 
         document.getElementById('plan-date').value = getLocalDateStr();
 
-        // --- AUTHENTIFICATION AVEC REDIRECT ---
         document.getElementById('btn-login').addEventListener('click', () => {
             try {
                 signInWithRedirect(auth, provider);
             } catch (error) {
-                console.error("Erreur de connexion :", error);
-                alert("Erreur de connexion : " + error.message);
+                alert("Impossible de lancer Google : " + error.message);
             }
         });
 
@@ -195,7 +203,6 @@
         onAuthStateChanged(auth, (user) => {
             if (user) {
                 currentUser = user;
-                // Détecter Mimi avec une sécurité si displayName est null
                 const name = user.displayName ? user.displayName.toLowerCase() : "";
                 isMimi = name.includes('mimi'); 
                 
