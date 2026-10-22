@@ -227,11 +227,11 @@
         let selectedPlanDateStr = null; 
         let chartInstance = null;
         let todayPlannedExercises = [];
-        window.forceShowInput = {}; // Object to track which exercises are forced open despite reaching goal
+        window.forceShowInput = {}; // Tracker pour forcer l'affichage de l'input
 
-        // --- PLAN DE MIMI AVEC JOURS DE REPOS MERCREDI ET DIMANCHE ---
+        // --- PLAN DE MIMI ---
         const mimiPlanData = [
-            [   // 0: Lundi
+            [   // Lundi
                 {name: "Chest-supported row", sets: "3", reps: "8–12"}, 
                 {name: "Seated lat pulldown", sets: "3", reps: "8–12"}, 
                 {name: "Seated incline dumbbell curls", sets: "3", reps: "10–12"}, 
@@ -240,7 +240,7 @@
                 {name: "Assisted pull-ups / negatives", sets: "2", reps: "10–15"}, 
                 {name: "Extra pulldown variation", sets: "2", reps: "10–15"}
             ],
-            [   // 1: Mardi
+            [   // Mardi
                 {name: "Seated chest press", sets: "3", reps: "8–12"}, 
                 {name: "Lying chest fly", sets: "2", reps: "10–15"}, 
                 {name: "Seated DB shoulder press", sets: "3", reps: "8–12"}, 
@@ -250,7 +250,7 @@
                 {name: "Supine dead bug", sets: "2", reps: "6-10/side"}, 
                 {name: "Side plank", sets: "2", reps: "30s"}
             ],
-            [   // 2: Jeudi
+            [   // Jeudi
                 {name: "Banded donkey kicks", sets: "3", reps: "12–15/s"}, 
                 {name: "Side-lying clamshells", sets: "3", reps: "15–20/s"}, 
                 {name: "Prone leg curl machine", sets: "3", reps: "10–15"}, 
@@ -263,7 +263,7 @@
                 {name: "Tabletop toe taps", sets: "4", reps: "30s"}, 
                 {name: "Side plank", sets: "4", reps: "30s"}
             ],
-            [   // 3: Vendredi
+            [   // Vendredi
                 {name: "Seated neutral-grip lat pulldown", sets: "3", reps: "8–12"}, 
                 {name: "Chest-supported row (diff grip)", sets: "3", reps: "8–12"}, 
                 {name: "Straight-arm cable pulldown", sets: "2", reps: "8–12"}, 
@@ -277,7 +277,7 @@
                 {name: "Front raises", sets: "3", reps: "10–15"}, 
                 {name: "Around-the-worlds", sets: "3", reps: "10–15"}
             ],
-            [   // 4: Samedi
+            [   // Samedi
                 {name: "Supine dead bugs", sets: "4", reps: "30s"}, 
                 {name: "Modified Pilates hundred", sets: "4", reps: "30s"}, 
                 {name: "Supine abdominal curl", sets: "4", reps: "30s"}, 
@@ -540,12 +540,23 @@
         };
 
         window.removeExerciseFromToday = async (exName) => {
-            if(!confirm(`Retirer ${exName} de la séance d'aujourd'hui ?`)) return;
+            if(!confirm(`Retirer ${exName} de la séance d'aujourd'hui ?\n(Cela supprimera aussi les séries que tu as déjà enregistrées pour cet exo aujourd'hui)`)) return;
+            
+            // Retirer du plan du jour
             todayPlannedExercises = todayPlannedExercises.filter(e => e !== exName);
             const dateStr = getLocalDateStr();
             await setDoc(doc(db, `users/${currentUser.uid}/plannedWorkouts`, dateStr), {
                 exercises: todayPlannedExercises
             }, { merge: true });
+            
+            // Supprimer toutes les logs du jour pour cet exo (pour qu'il disparaisse complètement de l'écran)
+            const todayStr = new Date().toDateString();
+            const logsToDelete = allLogs.filter(l => l.exercise === exName && l.ts && new Date(l.ts.toDate()).toDateString() === todayStr);
+            
+            for (let log of logsToDelete) {
+                await deleteDoc(doc(db, `users/${currentUser.uid}/workoutLogs`, log.id));
+            }
+            
             loadTodayWorkout();
         };
 
@@ -620,7 +631,6 @@
                         </div>
                 `;
 
-                // Afficher les sets complétés
                 exLogs.forEach((log, idx) => {
                     html += `
                         <div class="set-row bg-[#121212] rounded-xl px-2 py-2 border border-[#333]">
@@ -636,7 +646,6 @@
                     `;
                 });
 
-                // Gérer l'affichage de l'input si l'objectif n'est pas encore atteint (ou si on force l'affichage)
                 const nextSetNum = exLogs.length + 1;
                 let suggestedWeight = exLogs.length > 0 ? exLogs[exLogs.length-1].weight : (lastPerfLog ? lastPerfLog.weight : '');
                 let suggestedReps = exLogs.length > 0 ? exLogs[exLogs.length-1].reps : (lastPerfLog ? lastPerfLog.reps : '');
@@ -656,7 +665,6 @@
                         </div>
                     `;
                 } else {
-                    // Objectif atteint !
                     html += `
                             <div class="mt-4 p-3 bg-emerald-900/20 border border-emerald-500/20 rounded-xl text-center">
                                 <div class="text-emerald-400 font-black mb-2 flex justify-center items-center gap-2"><span>✅</span> Objectif Atteint !</div>
@@ -685,6 +693,9 @@
             }
 
             try {
+                // Rénitialise l'affichage forcé de l'input pour fermer la boucle après l'ajout d'une série extra
+                window.forceShowInput[exName] = false;
+                
                 await addDoc(collection(db, `users/${currentUser.uid}/workoutLogs`), {
                     exercise: exName, weight, reps, ts: serverTimestamp()
                 });
