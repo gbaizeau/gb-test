@@ -34,7 +34,7 @@
         }
         
         .set-row {
-            display: grid; grid-template-columns: 1fr 2fr 10px 2fr 3fr;
+            display: grid; grid-template-columns: 1fr 2fr 10px 2fr 3.5fr;
             align-items: center; gap: 0.5rem; margin-bottom: 0.75rem;
         }
     </style>
@@ -70,14 +70,23 @@
                 </div>
             </div>
 
+            <!-- Liste des exercices du jour -->
             <div id="workout-exercises-container" class="space-y-4"></div>
             
-            <div class="mt-6 bg-[#121212] border border-[#333] p-4 rounded-2xl">
-                <p class="text-xs font-bold text-slate-400 mb-3 uppercase tracking-wider">Ajouter un exercice aujourd'hui</p>
+            <!-- Bloc Ajout d'Exercice -->
+            <div class="mt-6 bg-[#1c1c1e] border border-[#333] p-4 rounded-2xl shadow-lg">
+                <p class="text-[10px] font-bold text-slate-400 mb-3 uppercase tracking-widest pl-1">Ajouter à aujourd'hui</p>
                 <div class="flex space-x-2">
-                    <select id="today-add-ex-select" class="flex-1 bg-[#1c1c1e] border border-[#333] text-white rounded-xl p-3 font-semibold outline-none text-sm focus:border-violet-500"></select>
+                    <select id="today-add-ex-select" class="flex-1 bg-[#121212] border border-[#333] text-white rounded-xl p-3 font-semibold outline-none text-sm focus:border-violet-500"></select>
                     <button onclick="addExerciseToToday()" class="bg-violet-600 text-white px-5 rounded-xl font-black text-lg shadow-lg hover:bg-violet-500 transition">+</button>
                 </div>
+            </div>
+
+            <!-- NOUVEAU : Bloc Notes de Séance -->
+            <div class="mt-6 bg-[#1c1c1e] border border-[#333] p-5 rounded-2xl shadow-lg">
+                <p class="text-[10px] font-bold text-slate-400 mb-3 uppercase tracking-widest pl-1">Notes de la séance</p>
+                <textarea id="workout-notes" class="w-full bg-[#121212] border border-[#333] rounded-xl p-4 text-white text-sm font-medium focus:border-violet-500 outline-none mb-3" rows="3" placeholder="Douleurs, sensations, adaptations (ex: oiseau d'un seul bras)..."></textarea>
+                <button onclick="saveWorkoutNote()" class="bg-[#2c2c2e] hover:bg-violet-600 text-violet-400 hover:text-white px-4 py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition w-full border border-[#444] hover:border-violet-500">Enregistrer la note</button>
             </div>
         </div>
 
@@ -114,7 +123,6 @@
                     </div>
 
                     <div class="border-t border-[#333] pt-5 mt-2 space-y-5">
-                        <!-- Action: Décaler -->
                         <div>
                             <label class="block text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-wider">Décaler cette séance au :</label>
                             <div class="flex space-x-2">
@@ -122,8 +130,6 @@
                                 <button onclick="shiftWorkout()" class="bg-orange-500 text-white px-4 rounded-xl font-bold text-xs uppercase tracking-wider shadow-lg hover:bg-orange-400 transition">Décaler</button>
                             </div>
                         </div>
-                        
-                        <!-- Action: Copier une séance passée -->
                         <div>
                             <label class="block text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-wider">Copier depuis le :</label>
                             <div class="flex space-x-2">
@@ -139,10 +145,18 @@
 
         <!-- TAB 3: PROGRESSION -->
         <div id="view-progress" class="hidden">
-            <div class="bg-[#1c1c1e] p-6 rounded-[2rem] shadow-lg">
+            <div class="bg-[#1c1c1e] p-6 rounded-[2rem] shadow-lg mb-6">
                 <h2 class="text-lg font-black text-white mb-6">Analyse de progression</h2>
                 <select id="chart-exercise-select" onchange="renderChart()" class="w-full bg-[#121212] border border-[#333] text-white rounded-xl p-4 mb-8 font-semibold outline-none focus:border-violet-500"></select>
                 <div style="height: 300px; width: 100%; position: relative;"><canvas id="progression-chart"></canvas></div>
+            </div>
+
+            <!-- NOUVEAU : Historique complet des séances -->
+            <div class="bg-[#1c1c1e] p-6 rounded-[2rem] shadow-lg">
+                <h2 class="text-lg font-black text-white mb-6">Historique des Séances</h2>
+                <div id="workout-history-list" class="space-y-4">
+                    <!-- Historique généré en JS -->
+                </div>
             </div>
         </div>
 
@@ -209,7 +223,7 @@
     <!-- Firebase & Logic -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-        import { getFirestore, collection, doc, setDoc, getDoc, addDoc, deleteDoc, onSnapshot, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+        import { getFirestore, collection, doc, setDoc, getDoc, addDoc, deleteDoc, updateDoc, onSnapshot, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
         import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 
         const firebaseConfig = {
@@ -232,6 +246,7 @@
         let currentUser = null;
         let isMimi = false;
         let allLogs = [];
+        let allNotes = {}; // Historique des notes de séance
         let customExercises = [];
         
         let currentWeekStartDate = new Date();
@@ -241,6 +256,7 @@
         let todayPlannedExercises = [];
         window.forceShowInput = {}; 
 
+        // --- PLAN DE MIMI ---
         const mimiPlanData = [
             [   // Lundi
                 {name: "Chest-supported row", sets: "3", reps: "8–12"}, 
@@ -314,11 +330,11 @@
             const weekMapping = [
                 mimiPlanData[0], // Lundi
                 mimiPlanData[1], // Mardi
-                [],              // Mercredi (Repos)
+                [],              // Mercredi
                 mimiPlanData[2], // Jeudi
                 mimiPlanData[3], // Vendredi
                 mimiPlanData[4], // Samedi
-                []               // Dimanche (Repos)
+                []               // Dimanche
             ];
             
             let count = 0;
@@ -336,7 +352,7 @@
                     count++;
                 }
             }
-            alert(`Succès ! Les 9 semaines ont été re-générées avec les bons jours de repos.`);
+            alert(`Succès ! Les 9 semaines ont été re-générées.`);
             loadWeekView(); 
             loadTodayWorkout();
         };
@@ -421,7 +437,10 @@
             
             document.getElementById(`view-${tab}`).classList.remove('hidden');
             document.getElementById(`tab-${tab}`).classList.add('active');
-            if(tab === 'progress') renderChart();
+            if(tab === 'progress') {
+                renderChart();
+                renderWorkoutHistory();
+            }
             if(tab === 'plan') loadWeekView();
         };
 
@@ -432,12 +451,24 @@
                 updateExerciseDropdowns();
             });
 
+            // Notes de séances
+            onSnapshot(collection(db, `users/${currentUser.uid}/workoutNotes`), (snap) => {
+                allNotes = {};
+                snap.forEach(doc => { allNotes[doc.id] = doc.data().note; });
+                if(!document.getElementById('view-progress').classList.contains('hidden')) {
+                    renderWorkoutHistory();
+                }
+            });
+
             const logsQuery = query(collection(db, `users/${currentUser.uid}/workoutLogs`), orderBy('ts', 'desc'));
             onSnapshot(logsQuery, (snapshot) => {
                 allLogs = [];
                 snapshot.forEach(doc => allLogs.push({id: doc.id, ...doc.data()}));
-                if(document.getElementById('view-workout').classList.contains('hidden') === false) {
+                if(!document.getElementById('view-workout').classList.contains('hidden')) {
                    renderWorkoutCards();
+                }
+                if(!document.getElementById('view-progress').classList.contains('hidden')) {
+                    renderWorkoutHistory();
                 }
             });
 
@@ -453,15 +484,16 @@
                     if(!data.ts) return;
                     const d = new Date(data.ts.toDate()).toLocaleDateString('fr-FR', {weekday: 'long', day: 'numeric', month: 'short'});
                     rehabList.innerHTML += `
-                        <div class="bg-[#1c1c1e] border border-[#333] p-4 rounded-xl">
-                            <div class="flex justify-between items-center mb-2">
+                        <div class="bg-[#1c1c1e] border border-[#333] p-4 rounded-xl relative">
+                            <button onclick="deleteRehab('${doc.id}')" class="absolute top-2 right-2 w-6 h-6 flex items-center justify-center bg-[#2c2c2e] hover:bg-red-500/20 text-slate-500 hover:text-red-400 rounded-full font-black text-lg transition">&times;</button>
+                            <div class="flex justify-between items-center mb-3 pr-6">
                                 <span class="text-white font-bold text-sm capitalize">${d}</span>
                                 <div class="flex gap-2 text-[10px] font-black uppercase">
-                                    <span class="bg-emerald-900/40 text-emerald-400 px-2 py-1 rounded">Réveil: ${data.painMorning}/10</span>
-                                    <span class="bg-orange-900/40 text-orange-400 px-2 py-1 rounded">Activité: ${data.painActivity}/10</span>
+                                    <span class="bg-emerald-900/40 text-emerald-400 px-2 py-1 rounded">Réveil: ${data.painMorning}</span>
+                                    <span class="bg-orange-900/40 text-orange-400 px-2 py-1 rounded">Activité: ${data.painActivity}</span>
                                 </div>
                             </div>
-                            <p class="text-slate-400 text-xs">${data.notes || 'Aucune note.'}</p>
+                            <p class="text-slate-400 text-xs leading-relaxed">${data.notes || 'Aucune note.'}</p>
                         </div>`;
                     count++;
                 });
@@ -534,8 +566,34 @@
                 document.getElementById('workout-status-badge').innerText = "Aucun plan";
                 document.getElementById('workout-status-badge').className = "bg-slate-800 text-slate-400 text-xs px-3 py-1 rounded-full font-bold";
             }
+            
+            // Load Today's Note
+            if (allNotes[dateStr]) {
+                document.getElementById('workout-notes').value = allNotes[dateStr];
+            } else {
+                document.getElementById('workout-notes').value = "";
+            }
+            
             renderWorkoutCards();
         }
+
+        window.saveWorkoutNote = async () => {
+            const note = document.getElementById('workout-notes').value;
+            const dateStr = getLocalDateStr();
+            try {
+                await setDoc(doc(db, `users/${currentUser.uid}/workoutNotes`, dateStr), {
+                    note: note, ts: serverTimestamp()
+                }, {merge: true});
+                
+                const btn = document.querySelector('button[onclick="saveWorkoutNote()"]');
+                btn.innerText = "✅ Enregistré !";
+                btn.classList.add('bg-emerald-600', 'text-white', 'border-emerald-500');
+                setTimeout(() => {
+                    btn.innerText = "Enregistrer la note";
+                    btn.classList.remove('bg-emerald-600', 'text-white', 'border-emerald-500');
+                }, 2000);
+            } catch (e) { alert("Erreur."); }
+        };
 
         window.addExerciseToToday = async () => {
             const ex = document.getElementById('today-add-ex-select').value;
@@ -565,8 +623,27 @@
             for (let log of logsToDelete) {
                 await deleteDoc(doc(db, `users/${currentUser.uid}/workoutLogs`, log.id));
             }
-            
             loadTodayWorkout();
+        };
+
+        // --- NOUVEAU : MODIFIER UNE LOG ---
+        window.editLog = async (logId, oldReps, oldWeight) => {
+            let newRepsStr = prompt("Modifier le nombre de répétitions :", oldReps);
+            if (newRepsStr === null) return; 
+            
+            let newWeightStr = prompt("Modifier le poids (kg) :", oldWeight);
+            if (newWeightStr === null) return;
+            
+            const newReps = parseInt(newRepsStr);
+            const newWeight = parseFloat(newWeightStr.replace(',', '.'));
+            
+            if (!isNaN(newReps) && !isNaN(newWeight)) {
+                try {
+                    await updateDoc(doc(db, `users/${currentUser.uid}/workoutLogs`, logId), {
+                        reps: newReps, weight: newWeight
+                    });
+                } catch(e) { alert("Erreur de mise à jour."); }
+            }
         };
 
         window.deleteLog = async (logId) => {
@@ -641,15 +718,17 @@
                 `;
 
                 exLogs.forEach((log, idx) => {
+                    // Ajout du bouton d'édition (Crayon)
                     html += `
                         <div class="set-row bg-[#121212] rounded-xl px-2 py-2 border border-[#333]">
                             <div class="w-6 h-6 rounded-full bg-violet-600/30 text-violet-400 flex items-center justify-center text-xs font-black mx-auto">${idx + 1}</div>
                             <div class="text-center font-black text-white text-lg">${log.reps}</div>
                             <div class="text-slate-600 text-xs font-bold text-center">&times;</div>
                             <div class="text-center font-black text-white text-lg">${log.weight}</div>
-                            <div class="flex justify-end items-center gap-2">
-                                <span class="text-emerald-400 text-lg">✔</span>
-                                <button onclick="deleteLog('${log.id}')" class="text-slate-500 hover:text-red-500 text-xl font-black">&times;</button>
+                            <div class="flex justify-end items-center gap-2 pr-1">
+                                <span class="text-emerald-400 text-sm hidden sm:inline mr-1">✔</span>
+                                <button onclick="editLog('${log.id}', ${log.reps}, ${log.weight})" class="text-slate-500 hover:text-blue-400 text-lg transition">✏️</button>
+                                <button onclick="deleteLog('${log.id}')" class="text-slate-500 hover:text-red-500 text-xl font-black transition">&times;</button>
                             </div>
                         </div>
                     `;
@@ -703,16 +782,13 @@
 
             try {
                 window.forceShowInput[exName] = false;
-                
                 await addDoc(collection(db, `users/${currentUser.uid}/workoutLogs`), {
                     exercise: exName, weight, reps, ts: serverTimestamp()
                 });
-            } catch (e) { 
-                alert("Erreur d'enregistrement."); 
-            }
+            } catch (e) { alert("Erreur d'enregistrement."); }
         };
 
-        // --- PLANNING : VUE SEMAINE ---
+        // --- PLANNING ---
         window.changeWeek = (offset) => {
             currentWeekStartDate.setDate(currentWeekStartDate.getDate() + (offset * 7));
             closeDayEditor();
@@ -777,7 +853,6 @@
             document.getElementById('editor-date-label').innerText = `Édition : ${dayName} ${dayNum}`;
             document.getElementById('shift-date').value = dateStr; 
             
-            // Pré-remplir la copie avec la date d'il y a 7 jours
             let lastWeek = new Date(dateStr);
             lastWeek.setDate(lastWeek.getDate() - 7);
             document.getElementById('copy-date').value = getLocalDateStr(lastWeek);
@@ -850,18 +925,14 @@
                 try {
                     await setDoc(doc(db, `users/${currentUser.uid}/plannedWorkouts`, targetDateStr), { exercises: exosToMove }, { merge: true });
                     await deleteDoc(doc(db, `users/${currentUser.uid}/plannedWorkouts`, selectedPlanDateStr));
-                    
                     weekPlansData[selectedPlanDateStr] = []; 
                     closeDayEditor();
                     loadWeekView(); 
                     if(selectedPlanDateStr === getLocalDateStr() || targetDateStr === getLocalDateStr()) loadTodayWorkout();
-                } catch(e) {
-                    alert("Erreur lors du décalage.");
-                }
+                } catch(e) { alert("Erreur lors du décalage."); }
             }
         };
 
-        // --- NOUVEAU : COPIER UNE SÉANCE PASSÉE ---
         window.copyWorkoutPlan = async () => {
             const sourceDateStr = document.getElementById('copy-date').value;
             if(!sourceDateStr || sourceDateStr === selectedPlanDateStr) return;
@@ -870,31 +941,23 @@
                 const docSnap = await getDoc(doc(db, `users/${currentUser.uid}/plannedWorkouts`, sourceDateStr));
                 if (docSnap.exists() && docSnap.data().exercises && docSnap.data().exercises.length > 0) {
                     const sourceExos = docSnap.data().exercises;
-                    
                     if(confirm(`Copier les ${sourceExos.length} exercices du ${sourceDateStr} vers le ${selectedPlanDateStr} ?`)) {
                         weekPlansData[selectedPlanDateStr] = [...sourceExos];
-                        
                         await setDoc(doc(db, `users/${currentUser.uid}/plannedWorkouts`, selectedPlanDateStr), {
                             exercises: weekPlansData[selectedPlanDateStr]
                         }, { merge: true });
-                        
                         renderEditorList();
                         loadWeekView();
-                        if(selectedPlanDateStr === getLocalDateStr()) {
-                            loadTodayWorkout();
-                        }
+                        if(selectedPlanDateStr === getLocalDateStr()) loadTodayWorkout();
                         alert("Séance copiée avec succès !");
                     }
                 } else {
                     alert("Aucun plan trouvé à cette date !");
                 }
-            } catch(e) {
-                console.error(e);
-                alert("Erreur lors de la copie.");
-            }
+            } catch(e) { alert("Erreur lors de la copie."); }
         };
 
-        // --- REHAB ET GRAPHIQUES ---
+        // --- REHAB ---
         window.saveRehab = async () => {
             const morning = parseInt(document.getElementById('pain-morning').value);
             const activity = parseInt(document.getElementById('pain-activity').value);
@@ -907,6 +970,82 @@
                 document.getElementById('rehab-notes').value = '';
             } catch (e) { alert("Erreur d'enregistrement."); }
         };
+
+        window.deleteRehab = async (logId) => {
+            if(confirm("Supprimer ce bilan d'historique ?")) {
+                await deleteDoc(doc(db, `users/${currentUser.uid}/rehabLogs`, logId));
+            }
+        };
+
+        // --- NOUVEAU : HISTORIQUE SÉANCES ---
+        function renderWorkoutHistory() {
+            const container = document.getElementById('workout-history-list');
+            if(!container) return;
+            
+            // Regrouper les logs par date
+            const grouped = {};
+            allLogs.forEach(log => {
+                if(!log.ts) return;
+                const d = log.ts.toDate();
+                const offset = d.getTimezoneOffset() * 60000;
+                const dateKey = (new Date(d - offset)).toISOString().split('T')[0];
+                
+                if(!grouped[dateKey]) grouped[dateKey] = { date: d, logs: [] };
+                grouped[dateKey].logs.push(log);
+            });
+            
+            // Trier les dates (du plus récent au plus ancien)
+            const sortedKeys = Object.keys(grouped).sort((a,b) => b.localeCompare(a));
+            
+            container.innerHTML = '';
+            if(sortedKeys.length === 0) {
+                container.innerHTML = '<p class="text-sm text-slate-500 italic">Aucune séance passée.</p>';
+                return;
+            }
+            
+            let count = 0;
+            sortedKeys.forEach(key => {
+                if(count >= 10) return; // Limite aux 10 dernières séances
+                const dayData = grouped[key];
+                const dateStrDisplay = dayData.date.toLocaleDateString('fr-FR', {weekday: 'long', day: 'numeric', month: 'long'});
+                const note = allNotes[key];
+                
+                // Regrouper par exercice pour cette journée
+                const exMap = {};
+                // Inverser pour l'ordre chronologique des séries
+                [...dayData.logs].reverse().forEach(l => {
+                    if(!exMap[l.exercise]) exMap[l.exercise] = [];
+                    exMap[l.exercise].push(l);
+                });
+                
+                let exHtml = '';
+                for(let ex in exMap) {
+                    const setsStr = exMap[ex].map(s => `${s.weight}kg &times; ${s.reps}`).join(' | ');
+                    exHtml += `
+                        <div class="mb-2">
+                            <span class="text-xs font-bold text-violet-400 block">${ex}</span>
+                            <span class="text-xs text-slate-300">${setsStr}</span>
+                        </div>`;
+                }
+                
+                let noteHtml = note ? `
+                    <div class="mt-3 p-3 bg-[#121212] rounded-xl border border-[#333]">
+                        <span class="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">Notes de séance</span>
+                        <p class="text-xs text-slate-400 italic">"${note}"</p>
+                    </div>` : '';
+                
+                container.innerHTML += `
+                    <div class="bg-[#121212] p-5 rounded-2xl border border-[#333] mb-4 shadow-md">
+                        <h4 class="font-black text-white capitalize mb-4 border-b border-[#333] pb-2 text-lg">${dateStrDisplay}</h4>
+                        <div class="space-y-1">
+                            ${exHtml}
+                        </div>
+                        ${noteHtml}
+                    </div>
+                `;
+                count++;
+            });
+        }
 
         window.renderChart = () => {
             const ctx = document.getElementById('progression-chart').getContext('2d');
