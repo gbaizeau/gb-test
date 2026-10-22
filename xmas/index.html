@@ -82,7 +82,7 @@
                 </div>
             </div>
 
-            <!-- NOUVEAU : Bloc Notes de Séance -->
+            <!-- Bloc Notes de Séance -->
             <div class="mt-6 bg-[#1c1c1e] border border-[#333] p-5 rounded-2xl shadow-lg">
                 <p class="text-[10px] font-bold text-slate-400 mb-3 uppercase tracking-widest pl-1">Notes de la séance</p>
                 <textarea id="workout-notes" class="w-full bg-[#121212] border border-[#333] rounded-xl p-4 text-white text-sm font-medium focus:border-violet-500 outline-none mb-3" rows="3" placeholder="Douleurs, sensations, adaptations (ex: oiseau d'un seul bras)..."></textarea>
@@ -151,7 +151,7 @@
                 <div style="height: 300px; width: 100%; position: relative;"><canvas id="progression-chart"></canvas></div>
             </div>
 
-            <!-- NOUVEAU : Historique complet des séances -->
+            <!-- Historique complet des séances -->
             <div class="bg-[#1c1c1e] p-6 rounded-[2rem] shadow-lg">
                 <h2 class="text-lg font-black text-white mb-6">Historique des Séances</h2>
                 <div id="workout-history-list" class="space-y-4">
@@ -246,7 +246,7 @@
         let currentUser = null;
         let isMimi = false;
         let allLogs = [];
-        let allNotes = {}; // Historique des notes de séance
+        let allNotes = {}; 
         let customExercises = [];
         
         let currentWeekStartDate = new Date();
@@ -255,6 +255,7 @@
         let chartInstance = null;
         let todayPlannedExercises = [];
         window.forceShowInput = {}; 
+        window.editingLogId = null; // Tracker pour l'édition en ligne d'une série
 
         // --- PLAN DE MIMI ---
         const mimiPlanData = [
@@ -328,13 +329,7 @@
             let startMonday = new Date(d.setDate(diff));
             
             const weekMapping = [
-                mimiPlanData[0], // Lundi
-                mimiPlanData[1], // Mardi
-                [],              // Mercredi
-                mimiPlanData[2], // Jeudi
-                mimiPlanData[3], // Vendredi
-                mimiPlanData[4], // Samedi
-                []               // Dimanche
+                mimiPlanData[0], mimiPlanData[1], [], mimiPlanData[2], mimiPlanData[3], mimiPlanData[4], []
             ];
             
             let count = 0;
@@ -342,7 +337,6 @@
                 for(let dayIndex = 0; dayIndex < 7; dayIndex++) {
                     let workoutDate = new Date(startMonday);
                     workoutDate.setDate(workoutDate.getDate() + (week * 7) + dayIndex);
-                    
                     let dateStr = getLocalDateStr(workoutDate);
                     let exercises = weekMapping[dayIndex].map(ex => ex.name);
                     
@@ -451,7 +445,6 @@
                 updateExerciseDropdowns();
             });
 
-            // Notes de séances
             onSnapshot(collection(db, `users/${currentUser.uid}/workoutNotes`), (snap) => {
                 allNotes = {};
                 snap.forEach(doc => { allNotes[doc.id] = doc.data().note; });
@@ -489,8 +482,8 @@
                             <div class="flex justify-between items-center mb-3 pr-6">
                                 <span class="text-white font-bold text-sm capitalize">${d}</span>
                                 <div class="flex gap-2 text-[10px] font-black uppercase">
-                                    <span class="bg-emerald-900/40 text-emerald-400 px-2 py-1 rounded">Réveil: ${data.painMorning}</span>
-                                    <span class="bg-orange-900/40 text-orange-400 px-2 py-1 rounded">Activité: ${data.painActivity}</span>
+                                    <span class="bg-emerald-900/40 text-emerald-400 px-2 py-1 rounded">Réveil: ${data.painMorning}/10</span>
+                                    <span class="bg-orange-900/40 text-orange-400 px-2 py-1 rounded">Activité: ${data.painActivity}/10</span>
                                 </div>
                             </div>
                             <p class="text-slate-400 text-xs leading-relaxed">${data.notes || 'Aucune note.'}</p>
@@ -567,7 +560,6 @@
                 document.getElementById('workout-status-badge').className = "bg-slate-800 text-slate-400 text-xs px-3 py-1 rounded-full font-bold";
             }
             
-            // Load Today's Note
             if (allNotes[dateStr]) {
                 document.getElementById('workout-notes').value = allNotes[dateStr];
             } else {
@@ -609,7 +601,7 @@
         };
 
         window.removeExerciseFromToday = async (exName) => {
-            if(!confirm(`Retirer ${exName} de la séance d'aujourd'hui ?\n(Cela supprimera aussi les séries que tu as déjà enregistrées pour cet exo aujourd'hui)`)) return;
+            if(!confirm(`Retirer ${exName} de la séance d'aujourd'hui ?\n(Cela supprimera aussi les séries enregistrées pour cet exo)`)) return;
             
             todayPlannedExercises = todayPlannedExercises.filter(e => e !== exName);
             const dateStr = getLocalDateStr();
@@ -626,22 +618,30 @@
             loadTodayWorkout();
         };
 
-        // --- NOUVEAU : MODIFIER UNE LOG ---
-        window.editLog = async (logId, oldReps, oldWeight) => {
-            let newRepsStr = prompt("Modifier le nombre de répétitions :", oldReps);
-            if (newRepsStr === null) return; 
+        // --- ÉDITION EN LIGNE (INLINE EDITING) ---
+        window.startEdit = (logId) => {
+            window.editingLogId = logId;
+            renderWorkoutCards();
+        };
+
+        window.cancelEdit = () => {
+            window.editingLogId = null;
+            renderWorkoutCards();
+        };
+
+        window.saveEdit = async (logId) => {
+            const repsInput = document.getElementById(`edit-reps-${logId}`);
+            const weightInput = document.getElementById(`edit-weight-${logId}`);
             
-            let newWeightStr = prompt("Modifier le poids (kg) :", oldWeight);
-            if (newWeightStr === null) return;
-            
-            const newReps = parseInt(newRepsStr);
-            const newWeight = parseFloat(newWeightStr.replace(',', '.'));
+            const newReps = parseInt(repsInput.value);
+            const newWeight = parseFloat(weightInput.value);
             
             if (!isNaN(newReps) && !isNaN(newWeight)) {
                 try {
                     await updateDoc(doc(db, `users/${currentUser.uid}/workoutLogs`, logId), {
                         reps: newReps, weight: newWeight
                     });
+                    window.editingLogId = null;
                 } catch(e) { alert("Erreur de mise à jour."); }
             }
         };
@@ -718,20 +718,36 @@
                 `;
 
                 exLogs.forEach((log, idx) => {
-                    // Ajout du bouton d'édition (Crayon)
-                    html += `
-                        <div class="set-row bg-[#121212] rounded-xl px-2 py-2 border border-[#333]">
-                            <div class="w-6 h-6 rounded-full bg-violet-600/30 text-violet-400 flex items-center justify-center text-xs font-black mx-auto">${idx + 1}</div>
-                            <div class="text-center font-black text-white text-lg">${log.reps}</div>
-                            <div class="text-slate-600 text-xs font-bold text-center">&times;</div>
-                            <div class="text-center font-black text-white text-lg">${log.weight}</div>
-                            <div class="flex justify-end items-center gap-2 pr-1">
-                                <span class="text-emerald-400 text-sm hidden sm:inline mr-1">✔</span>
-                                <button onclick="editLog('${log.id}', ${log.reps}, ${log.weight})" class="text-slate-500 hover:text-blue-400 text-lg transition">✏️</button>
-                                <button onclick="deleteLog('${log.id}')" class="text-slate-500 hover:text-red-500 text-xl font-black transition">&times;</button>
+                    if (window.editingLogId === log.id) {
+                        // LIGNE EN MODE ÉDITION
+                        html += `
+                            <div class="set-row bg-[#1c1c1e] rounded-xl px-2 py-2 border border-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.3)]">
+                                <div class="w-6 h-6 rounded-full bg-blue-600/30 text-blue-400 flex items-center justify-center text-xs font-black mx-auto">${idx + 1}</div>
+                                <div><input type="number" inputmode="numeric" id="edit-reps-${log.id}" class="log-input text-base py-1 px-0" value="${log.reps}"></div>
+                                <div class="text-slate-600 text-xs font-bold text-center">&times;</div>
+                                <div><input type="number" inputmode="decimal" id="edit-weight-${log.id}" class="log-input text-base py-1 px-0" value="${log.weight}"></div>
+                                <div class="flex justify-end items-center gap-3 pr-2">
+                                    <button onclick="saveEdit('${log.id}')" class="text-blue-400 hover:text-blue-300 text-xl transition">💾</button>
+                                    <button onclick="cancelEdit()" class="text-slate-500 hover:text-red-400 text-xl transition">&times;</button>
+                                </div>
                             </div>
-                        </div>
-                    `;
+                        `;
+                    } else {
+                        // LIGNE NORMALE COMPLÉTÉE
+                        html += `
+                            <div class="set-row bg-[#121212] rounded-xl px-2 py-2 border border-[#333]">
+                                <div class="w-6 h-6 rounded-full bg-violet-600/30 text-violet-400 flex items-center justify-center text-xs font-black mx-auto">${idx + 1}</div>
+                                <div class="text-center font-black text-white text-lg">${log.reps}</div>
+                                <div class="text-slate-600 text-xs font-bold text-center">&times;</div>
+                                <div class="text-center font-black text-white text-lg">${log.weight}</div>
+                                <div class="flex justify-end items-center gap-2 pr-1">
+                                    <span class="text-emerald-400 text-sm hidden sm:inline mr-1">✔</span>
+                                    <button onclick="startEdit('${log.id}')" class="text-slate-500 hover:text-blue-400 text-lg transition">✏️</button>
+                                    <button onclick="deleteLog('${log.id}')" class="text-slate-500 hover:text-red-500 text-xl font-black transition">&times;</button>
+                                </div>
+                            </div>
+                        `;
+                    }
                 });
 
                 const nextSetNum = exLogs.length + 1;
@@ -949,11 +965,8 @@
                         renderEditorList();
                         loadWeekView();
                         if(selectedPlanDateStr === getLocalDateStr()) loadTodayWorkout();
-                        alert("Séance copiée avec succès !");
                     }
-                } else {
-                    alert("Aucun plan trouvé à cette date !");
-                }
+                } else { alert("Aucun plan trouvé à cette date !"); }
             } catch(e) { alert("Erreur lors de la copie."); }
         };
 
@@ -977,12 +990,11 @@
             }
         };
 
-        // --- NOUVEAU : HISTORIQUE SÉANCES ---
+        // --- HISTORIQUE COMPLET DES SÉANCES ---
         function renderWorkoutHistory() {
             const container = document.getElementById('workout-history-list');
             if(!container) return;
             
-            // Regrouper les logs par date
             const grouped = {};
             allLogs.forEach(log => {
                 if(!log.ts) return;
@@ -994,7 +1006,6 @@
                 grouped[dateKey].logs.push(log);
             });
             
-            // Trier les dates (du plus récent au plus ancien)
             const sortedKeys = Object.keys(grouped).sort((a,b) => b.localeCompare(a));
             
             container.innerHTML = '';
@@ -1005,14 +1016,12 @@
             
             let count = 0;
             sortedKeys.forEach(key => {
-                if(count >= 10) return; // Limite aux 10 dernières séances
+                if(count >= 15) return; // Affiche les 15 dernières
                 const dayData = grouped[key];
                 const dateStrDisplay = dayData.date.toLocaleDateString('fr-FR', {weekday: 'long', day: 'numeric', month: 'long'});
                 const note = allNotes[key];
                 
-                // Regrouper par exercice pour cette journée
                 const exMap = {};
-                // Inverser pour l'ordre chronologique des séries
                 [...dayData.logs].reverse().forEach(l => {
                     if(!exMap[l.exercise]) exMap[l.exercise] = [];
                     exMap[l.exercise].push(l);
@@ -1020,22 +1029,22 @@
                 
                 let exHtml = '';
                 for(let ex in exMap) {
-                    const setsStr = exMap[ex].map(s => `${s.weight}kg &times; ${s.reps}`).join(' | ');
+                    const setsStr = exMap[ex].map(s => `${s.weight}kg &times; ${s.reps}`).join(' <span class="text-slate-600">|</span> ');
                     exHtml += `
-                        <div class="mb-2">
-                            <span class="text-xs font-bold text-violet-400 block">${ex}</span>
-                            <span class="text-xs text-slate-300">${setsStr}</span>
+                        <div class="mb-2 bg-[#121212] p-2 rounded-lg border border-[#333]">
+                            <span class="text-[11px] font-black text-violet-400 block mb-1 uppercase tracking-wider">${ex}</span>
+                            <span class="text-xs text-white font-semibold">${setsStr}</span>
                         </div>`;
                 }
                 
                 let noteHtml = note ? `
-                    <div class="mt-3 p-3 bg-[#121212] rounded-xl border border-[#333]">
-                        <span class="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">Notes de séance</span>
-                        <p class="text-xs text-slate-400 italic">"${note}"</p>
+                    <div class="mt-3 p-3 bg-[#121212] rounded-xl border border-violet-900/50">
+                        <span class="text-[10px] font-bold text-violet-400 uppercase tracking-widest block mb-1">📝 Notes de séance</span>
+                        <p class="text-xs text-slate-300 italic leading-relaxed">"${note}"</p>
                     </div>` : '';
                 
                 container.innerHTML += `
-                    <div class="bg-[#121212] p-5 rounded-2xl border border-[#333] mb-4 shadow-md">
+                    <div class="bg-[#1c1c1e] p-5 rounded-2xl border border-[#333] mb-4 shadow-md">
                         <h4 class="font-black text-white capitalize mb-4 border-b border-[#333] pb-2 text-lg">${dateStrDisplay}</h4>
                         <div class="space-y-1">
                             ${exHtml}
