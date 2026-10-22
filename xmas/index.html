@@ -14,15 +14,9 @@
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
         
         .log-input {
-            background-color: #1e1e24;
-            border: 1px solid #333;
-            color: white;
-            text-align: center;
-            font-weight: 700;
-            border-radius: 0.5rem;
-            padding: 0.5rem;
-            width: 100%;
-            transition: border-color 0.2s;
+            background-color: #1e1e24; border: 1px solid #333; color: white;
+            text-align: center; font-weight: 700; border-radius: 0.5rem;
+            padding: 0.5rem; width: 100%; transition: border-color 0.2s;
         }
         .log-input:focus { outline: none; border-color: #8b5cf6; }
         
@@ -61,7 +55,7 @@
         </div>
     </header>
 
-    <!-- Main Content Area -->
+    <!-- Main Content -->
     <div id="app-content" class="hidden container mx-auto px-4 space-y-6">
         
         <!-- TAB 1: WORKOUT -->
@@ -78,7 +72,6 @@
 
             <div id="workout-exercises-container" class="space-y-4"></div>
             
-            <!-- Ajout rapide d'un exercice au jour même -->
             <div class="mt-6 bg-[#121212] border border-[#333] p-4 rounded-2xl">
                 <p class="text-xs font-bold text-slate-400 mb-3 uppercase tracking-wider">Ajouter un exercice aujourd'hui</p>
                 <div class="flex space-x-2">
@@ -170,7 +163,6 @@
 
                 <button onclick="saveRehab()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-4 rounded-2xl font-black uppercase tracking-widest text-sm transition shadow-lg shadow-emerald-900/50">Enregistrer le bilan</button>
                 
-                <!-- NEW: Rehab History -->
                 <div class="mt-8 pt-6 border-t border-[#333]">
                     <h3 class="text-sm font-black text-slate-400 uppercase tracking-widest mb-4">Derniers bilans</h3>
                     <div id="rehab-history-list" class="space-y-3"></div>
@@ -235,6 +227,7 @@
         let selectedPlanDateStr = null; 
         let chartInstance = null;
         let todayPlannedExercises = [];
+        window.forceShowInput = {}; // Object to track which exercises are forced open despite reaching goal
 
         // --- PLAN DE MIMI AVEC JOURS DE REPOS MERCREDI ET DIMANCHE ---
         const mimiPlanData = [
@@ -307,7 +300,6 @@
             let diff = d.getDate() - day + (day === 0 ? -6 : 1);
             let startMonday = new Date(d.setDate(diff));
             
-            // Mapping des jours de la semaine : 0=Lun, 1=Mar, 2=Mer, 3=Jeu, 4=Ven, 5=Sam, 6=Dim
             const weekMapping = [
                 mimiPlanData[0], // Lundi
                 mimiPlanData[1], // Mardi
@@ -327,7 +319,6 @@
                     let dateStr = getLocalDateStr(workoutDate);
                     let exercises = weekMapping[dayIndex].map(ex => ex.name);
                     
-                    // On écrase les anciennes données pour ce jour
                     await setDoc(doc(db, `users/${currentUser.uid}/plannedWorkouts`, dateStr), {
                         exercises: exercises
                     });
@@ -439,7 +430,6 @@
                 }
             });
 
-            // Affichage en direct de l'historique Rehab
             const rehabQuery = query(collection(db, `users/${currentUser.uid}/rehabLogs`), orderBy('ts', 'desc'));
             onSnapshot(rehabQuery, (snapshot) => {
                 const rehabList = document.getElementById('rehab-history-list');
@@ -473,7 +463,7 @@
         function updateExerciseDropdowns() {
             const planSelect = document.getElementById('add-ex-select');
             const chartSelect = document.getElementById('chart-exercise-select');
-            const todaySelect = document.getElementById('today-add-ex-select'); // Nouveau pour "Séance du jour"
+            const todaySelect = document.getElementById('today-add-ex-select');
             
             const currentPlanVal = planSelect?.value;
             const currentChartVal = chartSelect?.value;
@@ -517,7 +507,6 @@
             if(currentTodayVal && todaySelect) todaySelect.value = currentTodayVal;
         }
 
-        // --- NOUVEAU DESIGN ONGLET SÉANCE ---
         async function loadTodayWorkout() {
             const dateStr = getLocalDateStr();
             const docRef = doc(db, `users/${currentUser.uid}/plannedWorkouts`, dateStr);
@@ -560,6 +549,17 @@
             loadTodayWorkout();
         };
 
+        window.deleteLog = async (logId) => {
+            if(confirm("Supprimer cette série ?")) {
+                await deleteDoc(doc(db, `users/${currentUser.uid}/workoutLogs`, logId));
+            }
+        };
+
+        window.forceInputShow = (safeName) => {
+            window.forceShowInput[safeName] = true;
+            renderWorkoutCards();
+        };
+
         function renderWorkoutCards() {
             const container = document.getElementById('workout-exercises-container');
             container.innerHTML = '';
@@ -585,20 +585,19 @@
             exercisesToShow.forEach((exName, exIndex) => {
                 const exLogs = todayLogs.filter(l => l.exercise === exName).reverse(); 
                 const lastPerfLog = allLogs.find(l => l.exercise === exName && new Date(l.ts?.toDate()).toDateString() !== todayStr);
+                const safeName = exName.replace(/'/g, "\\'");
                 
                 const card = document.createElement('div');
                 card.className = "exercise-card";
                 
                 const details = getExerciseDetails(exName);
-                let planHTML = details ? `<span class="text-xs font-bold text-violet-400 bg-violet-900/30 px-2 py-1 rounded-md ml-2">${details.sets} Sets</span>` : '';
+                const targetSets = details ? parseInt(details.sets) : 0;
+                let planHTML = details ? `<span class="text-xs font-bold text-violet-400 bg-violet-900/30 px-2 py-1 rounded-md ml-2">${details.sets} Sets &times; ${details.reps}</span>` : '';
                 
                 let perfHTML = lastPerfLog 
                     ? `<div class="text-xs font-semibold text-slate-400 mt-1">Dernière perf: <span class="text-white">${lastPerfLog.weight}kg &times; ${lastPerfLog.reps}</span></div>` 
                     : '';
                 
-                // Le bouton X pour supprimer de la séance du jour
-                const safeName = exName.replace(/'/g, "\\'");
-
                 let html = `
                     <div class="flex justify-between items-start mb-4">
                         <div>
@@ -621,6 +620,7 @@
                         </div>
                 `;
 
+                // Afficher les sets complétés
                 exLogs.forEach((log, idx) => {
                     html += `
                         <div class="set-row bg-[#121212] rounded-xl px-2 py-2 border border-[#333]">
@@ -628,27 +628,43 @@
                             <div class="text-center font-black text-white text-lg">${log.reps}</div>
                             <div class="text-slate-600 text-xs font-bold text-center">&times;</div>
                             <div class="text-center font-black text-white text-lg">${log.weight}</div>
-                            <div class="flex justify-end">
-                                <span class="bg-emerald-500/20 text-emerald-400 text-[10px] font-bold px-2 py-1 rounded">✔ CHECK</span>
+                            <div class="flex justify-end items-center gap-2">
+                                <span class="text-emerald-400 text-lg">✔</span>
+                                <button onclick="deleteLog('${log.id}')" class="text-slate-500 hover:text-red-500 text-xl font-black">&times;</button>
                             </div>
                         </div>
                     `;
                 });
 
+                // Gérer l'affichage de l'input si l'objectif n'est pas encore atteint (ou si on force l'affichage)
                 const nextSetNum = exLogs.length + 1;
                 let suggestedWeight = exLogs.length > 0 ? exLogs[exLogs.length-1].weight : (lastPerfLog ? lastPerfLog.weight : '');
                 let suggestedReps = exLogs.length > 0 ? exLogs[exLogs.length-1].reps : (lastPerfLog ? lastPerfLog.reps : '');
                 
-                html += `
-                        <div class="set-row">
-                            <div class="w-6 h-6 rounded-full bg-[#333] text-slate-400 flex items-center justify-center text-xs font-black mx-auto">${nextSetNum}</div>
-                            <div><input type="number" inputmode="numeric" id="reps-${exIndex}" class="log-input text-lg" value="${suggestedReps}" placeholder="0"></div>
-                            <div class="text-slate-600 text-xs font-bold text-center">&times;</div>
-                            <div><input type="number" inputmode="decimal" id="weight-${exIndex}" class="log-input text-lg" value="${suggestedWeight}" placeholder="0"></div>
-                            <button onclick="saveSpecificSet('${safeName}', ${exIndex})" class="bg-[#2c2c2e] hover:bg-violet-600 text-white font-bold text-xs py-2 rounded-xl transition w-full shadow-md border border-[#444]">SAVE</button>
+                const isGoalReached = targetSets > 0 && exLogs.length >= targetSets;
+                const isForceShow = window.forceShowInput[exName] === true;
+
+                if (!isGoalReached || isForceShow) {
+                    html += `
+                            <div class="set-row">
+                                <div class="w-6 h-6 rounded-full bg-[#333] text-slate-400 flex items-center justify-center text-xs font-black mx-auto">${nextSetNum}</div>
+                                <div><input type="number" inputmode="numeric" id="reps-${exIndex}" class="log-input text-lg" value="${suggestedReps}" placeholder="0"></div>
+                                <div class="text-slate-600 text-xs font-bold text-center">&times;</div>
+                                <div><input type="number" inputmode="decimal" id="weight-${exIndex}" class="log-input text-lg" value="${suggestedWeight}" placeholder="0"></div>
+                                <button onclick="saveSpecificSet('${safeName}', ${exIndex})" class="bg-[#2c2c2e] hover:bg-violet-600 text-white font-bold text-xs py-2 rounded-xl transition w-full shadow-md border border-[#444]">SAVE</button>
+                            </div>
                         </div>
-                    </div>
-                `;
+                    `;
+                } else {
+                    // Objectif atteint !
+                    html += `
+                            <div class="mt-4 p-3 bg-emerald-900/20 border border-emerald-500/20 rounded-xl text-center">
+                                <div class="text-emerald-400 font-black mb-2 flex justify-center items-center gap-2"><span>✅</span> Objectif Atteint !</div>
+                                <button onclick="forceInputShow('${safeName}')" class="text-[10px] uppercase font-bold text-slate-400 hover:text-white underline">Ajouter une série supplémentaire</button>
+                            </div>
+                        </div>
+                    `;
+                }
                 
                 card.innerHTML = html;
                 container.appendChild(card);
