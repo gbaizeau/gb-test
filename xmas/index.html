@@ -113,11 +113,23 @@
                         <button onclick="addExerciseToPlan()" class="bg-violet-600 text-white px-5 rounded-xl font-black text-lg shadow-lg hover:bg-violet-500 transition">+</button>
                     </div>
 
-                    <div class="border-t border-[#333] pt-5 mt-2">
-                        <label class="block text-xs font-bold text-slate-400 mb-3">Décaler cette séance au :</label>
-                        <div class="flex space-x-2">
-                            <input type="date" id="shift-date" class="flex-1 bg-[#1c1c1e] border border-[#333] text-white rounded-xl p-3 text-sm font-bold outline-none focus:border-orange-500">
-                            <button onclick="shiftWorkout()" class="bg-orange-500 text-white px-4 rounded-xl font-bold text-xs uppercase tracking-wider shadow-lg hover:bg-orange-400 transition">Décaler</button>
+                    <div class="border-t border-[#333] pt-5 mt-2 space-y-5">
+                        <!-- Action: Décaler -->
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-wider">Décaler cette séance au :</label>
+                            <div class="flex space-x-2">
+                                <input type="date" id="shift-date" class="flex-1 bg-[#1c1c1e] border border-[#333] text-white rounded-xl p-2 text-sm font-bold outline-none focus:border-orange-500">
+                                <button onclick="shiftWorkout()" class="bg-orange-500 text-white px-4 rounded-xl font-bold text-xs uppercase tracking-wider shadow-lg hover:bg-orange-400 transition">Décaler</button>
+                            </div>
+                        </div>
+                        
+                        <!-- Action: Copier une séance passée -->
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-wider">Copier depuis le :</label>
+                            <div class="flex space-x-2">
+                                <input type="date" id="copy-date" class="flex-1 bg-[#1c1c1e] border border-[#333] text-white rounded-xl p-2 text-sm font-bold outline-none focus:border-violet-500">
+                                <button onclick="copyWorkoutPlan()" class="bg-violet-600 text-white px-4 rounded-xl font-bold text-xs uppercase tracking-wider shadow-lg hover:bg-violet-500 transition">Copier</button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -227,9 +239,8 @@
         let selectedPlanDateStr = null; 
         let chartInstance = null;
         let todayPlannedExercises = [];
-        window.forceShowInput = {}; // Tracker pour forcer l'affichage de l'input
+        window.forceShowInput = {}; 
 
-        // --- PLAN DE MIMI ---
         const mimiPlanData = [
             [   // Lundi
                 {name: "Chest-supported row", sets: "3", reps: "8–12"}, 
@@ -542,14 +553,12 @@
         window.removeExerciseFromToday = async (exName) => {
             if(!confirm(`Retirer ${exName} de la séance d'aujourd'hui ?\n(Cela supprimera aussi les séries que tu as déjà enregistrées pour cet exo aujourd'hui)`)) return;
             
-            // Retirer du plan du jour
             todayPlannedExercises = todayPlannedExercises.filter(e => e !== exName);
             const dateStr = getLocalDateStr();
             await setDoc(doc(db, `users/${currentUser.uid}/plannedWorkouts`, dateStr), {
                 exercises: todayPlannedExercises
             }, { merge: true });
             
-            // Supprimer toutes les logs du jour pour cet exo (pour qu'il disparaisse complètement de l'écran)
             const todayStr = new Date().toDateString();
             const logsToDelete = allLogs.filter(l => l.exercise === exName && l.ts && new Date(l.ts.toDate()).toDateString() === todayStr);
             
@@ -693,7 +702,6 @@
             }
 
             try {
-                // Rénitialise l'affichage forcé de l'input pour fermer la boucle après l'ajout d'une série extra
                 window.forceShowInput[exName] = false;
                 
                 await addDoc(collection(db, `users/${currentUser.uid}/workoutLogs`), {
@@ -768,6 +776,12 @@
             selectedPlanDateStr = dateStr;
             document.getElementById('editor-date-label').innerText = `Édition : ${dayName} ${dayNum}`;
             document.getElementById('shift-date').value = dateStr; 
+            
+            // Pré-remplir la copie avec la date d'il y a 7 jours
+            let lastWeek = new Date(dateStr);
+            lastWeek.setDate(lastWeek.getDate() - 7);
+            document.getElementById('copy-date').value = getLocalDateStr(lastWeek);
+
             document.getElementById('day-editor').classList.remove('hidden');
             setTimeout(() => document.getElementById('day-editor').scrollIntoView({behavior: "smooth", block: "nearest"}), 100);
             renderEditorList();
@@ -847,6 +861,40 @@
             }
         };
 
+        // --- NOUVEAU : COPIER UNE SÉANCE PASSÉE ---
+        window.copyWorkoutPlan = async () => {
+            const sourceDateStr = document.getElementById('copy-date').value;
+            if(!sourceDateStr || sourceDateStr === selectedPlanDateStr) return;
+
+            try {
+                const docSnap = await getDoc(doc(db, `users/${currentUser.uid}/plannedWorkouts`, sourceDateStr));
+                if (docSnap.exists() && docSnap.data().exercises && docSnap.data().exercises.length > 0) {
+                    const sourceExos = docSnap.data().exercises;
+                    
+                    if(confirm(`Copier les ${sourceExos.length} exercices du ${sourceDateStr} vers le ${selectedPlanDateStr} ?`)) {
+                        weekPlansData[selectedPlanDateStr] = [...sourceExos];
+                        
+                        await setDoc(doc(db, `users/${currentUser.uid}/plannedWorkouts`, selectedPlanDateStr), {
+                            exercises: weekPlansData[selectedPlanDateStr]
+                        }, { merge: true });
+                        
+                        renderEditorList();
+                        loadWeekView();
+                        if(selectedPlanDateStr === getLocalDateStr()) {
+                            loadTodayWorkout();
+                        }
+                        alert("Séance copiée avec succès !");
+                    }
+                } else {
+                    alert("Aucun plan trouvé à cette date !");
+                }
+            } catch(e) {
+                console.error(e);
+                alert("Erreur lors de la copie.");
+            }
+        };
+
+        // --- REHAB ET GRAPHIQUES ---
         window.saveRehab = async () => {
             const morning = parseInt(document.getElementById('pain-morning').value);
             const activity = parseInt(document.getElementById('pain-activity').value);
