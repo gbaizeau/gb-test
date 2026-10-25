@@ -88,24 +88,23 @@
                 <textarea id="workout-notes" class="w-full bg-[#121212] border border-[#333] rounded-xl p-4 text-white text-sm font-medium focus:border-violet-500 outline-none mb-3" rows="3" placeholder="Douleurs, sensations, adaptations (ex: oiseau d'un seul bras)..."></textarea>
                 <button onclick="saveWorkoutNote()" class="bg-[#2c2c2e] hover:bg-violet-600 text-violet-400 hover:text-white px-4 py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition w-full border border-[#444] hover:border-violet-500">Enregistrer la note</button>
             </div>
+
+            <!-- Validation de Séance -->
+            <button id="btn-complete-workout" onclick="toggleWorkoutCompletion()" class="hidden"></button>
         </div>
 
         <!-- TAB 2: PLANNING -->
         <div id="view-plan" class="hidden">
-            <div class="bg-[#1c1c1e] p-6 rounded-[2rem] shadow-lg">
+            <div class="bg-[#1c1c1e] p-4 sm:p-6 rounded-[2rem] shadow-lg">
                 
-                <div id="mimi-import-section" class="hidden mb-6 p-4 bg-emerald-900/20 border border-emerald-500/20 rounded-xl text-center">
-                    <p class="text-xs text-emerald-400 mb-3 font-medium">Pour générer/corriger ton plan (Repos Mer/Dim), clique ci-dessous :</p>
-                    <button onclick="importMimiPlan()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2.5 rounded-xl font-bold text-sm w-full transition shadow-lg shadow-emerald-900/50">🔁 Mettre à jour mon Plan</button>
-                </div>
-
                 <div class="flex justify-between items-center mb-6">
                     <button onclick="changeWeek(-1)" class="bg-[#2c2c2e] w-10 h-10 rounded-full flex items-center justify-center font-bold text-slate-300 hover:text-white transition">&larr;</button>
                     <h2 id="week-label" class="text-sm font-bold text-white tracking-wider">Semaine</h2>
                     <button onclick="changeWeek(1)" class="bg-[#2c2c2e] w-10 h-10 rounded-full flex items-center justify-center font-bold text-slate-300 hover:text-white transition">&rarr;</button>
                 </div>
 
-                <div id="week-grid" class="flex overflow-x-auto space-x-3 pb-4 scrollbar-hide mb-2 snap-x"></div>
+                <!-- Grille des Jours (7 jours entiers) -->
+                <div id="week-grid" class="grid grid-cols-7 gap-1 sm:gap-2 mb-4"></div>
 
                 <div id="day-editor" class="hidden bg-[#121212] border border-[#333] p-5 rounded-2xl relative mt-4">
                     <div class="flex justify-between items-center mb-5">
@@ -151,7 +150,6 @@
                 <div style="height: 300px; width: 100%; position: relative;"><canvas id="progression-chart"></canvas></div>
             </div>
 
-            <!-- Historique complet des séances -->
             <div class="bg-[#1c1c1e] p-6 rounded-[2rem] shadow-lg">
                 <h2 class="text-lg font-black text-white mb-6">Historique des Séances</h2>
                 <div id="workout-history-list" class="space-y-4">
@@ -251,11 +249,12 @@
         
         let currentWeekStartDate = new Date();
         let weekPlansData = {}; 
+        let weekCompletedData = {}; // NEW: Suivi des séances terminées
         let selectedPlanDateStr = null; 
         let chartInstance = null;
         let todayPlannedExercises = [];
         window.forceShowInput = {}; 
-        window.editingLogId = null; // Tracker pour l'édition en ligne d'une série
+        window.editingLogId = null;
 
         // --- PLAN DE MIMI ---
         const mimiPlanData = [
@@ -320,37 +319,6 @@
             ]
         ];
 
-        window.importMimiPlan = async () => {
-            if(!confirm("Mettre à jour les 9 semaines ?\n(Les jours de repos seront Mercredi et Dimanche).")) return;
-            
-            let d = new Date();
-            let day = d.getDay();
-            let diff = d.getDate() - day + (day === 0 ? -6 : 1);
-            let startMonday = new Date(d.setDate(diff));
-            
-            const weekMapping = [
-                mimiPlanData[0], mimiPlanData[1], [], mimiPlanData[2], mimiPlanData[3], mimiPlanData[4], []
-            ];
-            
-            let count = 0;
-            for(let week = 0; week < 9; week++) {
-                for(let dayIndex = 0; dayIndex < 7; dayIndex++) {
-                    let workoutDate = new Date(startMonday);
-                    workoutDate.setDate(workoutDate.getDate() + (week * 7) + dayIndex);
-                    let dateStr = getLocalDateStr(workoutDate);
-                    let exercises = weekMapping[dayIndex].map(ex => ex.name);
-                    
-                    await setDoc(doc(db, `users/${currentUser.uid}/plannedWorkouts`, dateStr), {
-                        exercises: exercises
-                    });
-                    count++;
-                }
-            }
-            alert(`Succès ! Les 9 semaines ont été re-générées.`);
-            loadWeekView(); 
-            loadTodayWorkout();
-        };
-
         function getExerciseDetails(exName) {
             for (let day of mimiPlanData) {
                 const ex = day.find(e => e.name === exName);
@@ -409,7 +377,6 @@
                 
                 if(isMimi) {
                     document.getElementById('tab-rehab').classList.remove('hidden');
-                    document.getElementById('mimi-import-section').classList.remove('hidden');
                 }
                 
                 initApp();
@@ -548,16 +515,39 @@
             const docRef = doc(db, `users/${currentUser.uid}/plannedWorkouts`, dateStr);
             const docSnap = await getDoc(docRef);
             
+            let isCompleted = false;
+
             if (docSnap.exists() && docSnap.data().exercises && docSnap.data().exercises.length > 0) {
                 todayPlannedExercises = docSnap.data().exercises;
+                isCompleted = !!docSnap.data().completed;
                 document.getElementById('workout-day-title').innerText = "Séance du Jour";
-                document.getElementById('workout-status-badge').innerText = `${todayPlannedExercises.length} Exercices`;
-                document.getElementById('workout-status-badge').className = "bg-violet-600/20 text-violet-400 border border-violet-500/30 text-xs px-3 py-1 rounded-full font-bold";
+                
+                if (isCompleted) {
+                    document.getElementById('workout-status-badge').innerText = `Terminée 🏆`;
+                    document.getElementById('workout-status-badge').className = "bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 text-xs px-3 py-1 rounded-full font-bold";
+                } else {
+                    document.getElementById('workout-status-badge').innerText = `${todayPlannedExercises.length} Exercices`;
+                    document.getElementById('workout-status-badge').className = "bg-violet-600/20 text-violet-400 border border-violet-500/30 text-xs px-3 py-1 rounded-full font-bold";
+                }
             } else {
                 todayPlannedExercises = [];
                 document.getElementById('workout-day-title').innerText = "Jour de Repos";
                 document.getElementById('workout-status-badge').innerText = "Aucun plan";
                 document.getElementById('workout-status-badge').className = "bg-slate-800 text-slate-400 text-xs px-3 py-1 rounded-full font-bold";
+            }
+
+            const btnComplete = document.getElementById('btn-complete-workout');
+            if (todayPlannedExercises.length > 0) {
+                btnComplete.classList.remove('hidden');
+                if (isCompleted) {
+                    btnComplete.innerText = "✅ Séance Terminée (Annuler)";
+                    btnComplete.className = "mt-6 text-emerald-400 border border-emerald-500/30 bg-emerald-900/20 px-4 py-4 rounded-2xl font-black text-sm uppercase tracking-wider transition w-full";
+                } else {
+                    btnComplete.innerText = "🏁 Valider la séance";
+                    btnComplete.className = "mt-6 bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-4 rounded-2xl font-black text-sm uppercase tracking-wider transition w-full shadow-lg shadow-emerald-900/50";
+                }
+            } else {
+                btnComplete.classList.add('hidden');
             }
             
             if (allNotes[dateStr]) {
@@ -568,6 +558,22 @@
             
             renderWorkoutCards();
         }
+
+        window.toggleWorkoutCompletion = async () => {
+            const dateStr = getLocalDateStr();
+            const docRef = doc(db, `users/${currentUser.uid}/plannedWorkouts`, dateStr);
+            const docSnap = await getDoc(docRef);
+            let currentlyCompleted = docSnap.exists() && !!docSnap.data().completed;
+            
+            if(currentlyCompleted) {
+                if(!confirm("Annuler la validation de cette séance ?")) return;
+                await setDoc(docRef, { completed: false }, { merge: true });
+            } else {
+                if(!confirm("Valider définitivement la séance d'aujourd'hui ?")) return;
+                await setDoc(docRef, { completed: true }, { merge: true });
+            }
+            loadTodayWorkout();
+        };
 
         window.saveWorkoutNote = async () => {
             const note = document.getElementById('workout-notes').value;
@@ -618,7 +624,6 @@
             loadTodayWorkout();
         };
 
-        // --- ÉDITION EN LIGNE (INLINE EDITING) ---
         window.startEdit = (logId) => {
             window.editingLogId = logId;
             renderWorkoutCards();
@@ -719,7 +724,6 @@
 
                 exLogs.forEach((log, idx) => {
                     if (window.editingLogId === log.id) {
-                        // LIGNE EN MODE ÉDITION
                         html += `
                             <div class="set-row bg-[#1c1c1e] rounded-xl px-2 py-2 border border-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.3)]">
                                 <div class="w-6 h-6 rounded-full bg-blue-600/30 text-blue-400 flex items-center justify-center text-xs font-black mx-auto">${idx + 1}</div>
@@ -733,7 +737,6 @@
                             </div>
                         `;
                     } else {
-                        // LIGNE NORMALE COMPLÉTÉE
                         html += `
                             <div class="set-row bg-[#121212] rounded-xl px-2 py-2 border border-[#333]">
                                 <div class="w-6 h-6 rounded-full bg-violet-600/30 text-violet-400 flex items-center justify-center text-xs font-black mx-auto">${idx + 1}</div>
@@ -820,10 +823,11 @@
             document.getElementById('week-label').innerText = `${startStr} - ${endStr}`;
 
             const grid = document.getElementById('week-grid');
-            grid.innerHTML = '<div class="w-full text-center text-sm text-slate-500 py-4">Chargement...</div>';
+            grid.innerHTML = '<div class="w-full text-center text-sm text-slate-500 py-4 col-span-7">Chargement...</div>';
 
             const days = ["LUN", "MAR", "MER", "JEU", "VEN", "SAM", "DIM"];
             weekPlansData = {};
+            weekCompletedData = {}; 
 
             for(let i = 0; i < 7; i++) {
                 let d = new Date(currentWeekStartDate);
@@ -831,10 +835,12 @@
                 let dStr = getLocalDateStr(d);
                 
                 const docSnap = await getDoc(doc(db, `users/${currentUser.uid}/plannedWorkouts`, dStr));
-                if (docSnap.exists() && docSnap.data().exercises) {
-                    weekPlansData[dStr] = docSnap.data().exercises;
+                if (docSnap.exists()) {
+                    if (docSnap.data().exercises) weekPlansData[dStr] = docSnap.data().exercises;
+                    weekCompletedData[dStr] = !!docSnap.data().completed;
                 } else {
                     weekPlansData[dStr] = [];
+                    weekCompletedData[dStr] = false;
                 }
             }
 
@@ -847,17 +853,25 @@
                 let dStr = getLocalDateStr(d);
                 
                 const nbEx = weekPlansData[dStr].length;
+                const isCompleted = weekCompletedData[dStr];
                 const isToday = (dStr === todayStr);
+                
+                let dotClass = 'bg-transparent';
+                if(nbEx > 0) {
+                    if (isCompleted) dotClass = 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]';
+                    else if (isToday) dotClass = 'bg-white';
+                    else dotClass = 'bg-violet-500';
+                }
                 
                 const card = document.createElement('div');
                 card.onclick = () => openDayEditor(dStr, days[i], d.getDate());
-                card.className = `min-w-[70px] snap-center p-3 rounded-[1rem] cursor-pointer transition flex flex-col items-center justify-center text-center
+                card.className = `p-1 sm:p-2 rounded-xl cursor-pointer transition flex flex-col items-center justify-center text-center
                     ${isToday ? 'bg-violet-600 shadow-lg shadow-violet-900/50' : 'bg-[#121212] border border-[#333] hover:border-violet-500'}`;
                 
                 card.innerHTML = `
-                    <span class="text-[10px] font-black ${isToday ? 'text-violet-200' : 'text-slate-500'} tracking-wider">${days[i]}</span>
-                    <span class="text-xl font-black ${isToday ? 'text-white' : 'text-slate-300'} my-1">${d.getDate()}</span>
-                    <div class="w-2 h-2 rounded-full ${nbEx > 0 ? (isToday ? 'bg-white' : 'bg-violet-500') : 'bg-transparent'}"></div>
+                    <span class="text-[9px] sm:text-[10px] font-black ${isToday ? 'text-violet-200' : 'text-slate-500'} tracking-wider">${days[i]}</span>
+                    <span class="text-base sm:text-lg font-black ${isToday ? 'text-white' : 'text-slate-300'} my-1">${d.getDate()}</span>
+                    <div class="w-2 h-2 rounded-full ${dotClass}"></div>
                 `;
                 
                 grid.appendChild(card);
