@@ -298,6 +298,76 @@
         window.forceShowInput = {}; 
         window.editingLogId = null;
 
+        const mimiPlanData = [
+            [   // Lundi
+                {name: "Chest-supported row", sets: "3", reps: "8–12"}, 
+                {name: "Seated lat pulldown", sets: "3", reps: "8–12"}, 
+                {name: "Seated incline dumbbell curls", sets: "3", reps: "10–12"}, 
+                {name: "Seated hammer curls", sets: "2", reps: "10–15"}, 
+                {name: "Scapular pull-ups / dead hangs", sets: "2", reps: "10–15"}, 
+                {name: "Assisted pull-ups / negatives", sets: "2", reps: "10–15"}, 
+                {name: "Extra pulldown variation", sets: "2", reps: "10–15"}
+            ],
+            [   // Mardi
+                {name: "Seated chest press", sets: "3", reps: "8–12"}, 
+                {name: "Lying chest fly", sets: "2", reps: "10–15"}, 
+                {name: "Seated DB shoulder press", sets: "3", reps: "8–12"}, 
+                {name: "Seated lateral raises", sets: "3", reps: "12–20"}, 
+                {name: "Seated overhead triceps extension", sets: "3", reps: "10–15"}, 
+                {name: "Seated triceps pushdown", sets: "2", reps: "10–15"}, 
+                {name: "Supine dead bug", sets: "2", reps: "6-10/side"}, 
+                {name: "Side plank", sets: "2", reps: "30s"}
+            ],
+            [   // Jeudi
+                {name: "Banded donkey kicks", sets: "3", reps: "12–15/s"}, 
+                {name: "Side-lying clamshells", sets: "3", reps: "15–20/s"}, 
+                {name: "Prone leg curl machine", sets: "3", reps: "10–15"}, 
+                {name: "Seated leg extension", sets: "3", reps: "10–15"}, 
+                {name: "Seated hip abductor machine", sets: "3", reps: "12–20"}, 
+                {name: "Seated hip adductor machine", sets: "3", reps: "12–15"}, 
+                {name: "Single-leg glute bridge", sets: "3", reps: "12–15"}, 
+                {name: "Supine dead bug", sets: "4", reps: "30s"}, 
+                {name: "Bird dog", sets: "4", reps: "30s"}, 
+                {name: "Tabletop toe taps", sets: "4", reps: "30s"}, 
+                {name: "Side plank", sets: "4", reps: "30s"}
+            ],
+            [   // Vendredi
+                {name: "Seated neutral-grip lat pulldown", sets: "3", reps: "8–12"}, 
+                {name: "Chest-supported row (diff grip)", sets: "3", reps: "8–12"}, 
+                {name: "Straight-arm cable pulldown", sets: "2", reps: "8–12"}, 
+                {name: "Seated lateral raises", sets: "3", reps: "8–12"}, 
+                {name: "Chest-supported rear-delt fly", sets: "3", reps: "8–12"}, 
+                {name: "Seated biceps curls", sets: "3", reps: "8–12"}, 
+                {name: "Seated triceps extensions", sets: "3", reps: "10–15"}, 
+                {name: "Pull-up negatives / push-ups", sets: "3", reps: "10–15"}, 
+                {name: "Arnold press", sets: "3", reps: "10–15"}, 
+                {name: "Upright row", sets: "3", reps: "10–15"}, 
+                {name: "Front raises", sets: "3", reps: "10–15"}, 
+                {name: "Around-the-worlds", sets: "3", reps: "10–15"}
+            ],
+            [   // Samedi
+                {name: "Supine dead bugs", sets: "4", reps: "30s"}, 
+                {name: "Modified Pilates hundred", sets: "4", reps: "30s"}, 
+                {name: "Supine abdominal curl", sets: "4", reps: "30s"}, 
+                {name: "Supine abdominal bracing", sets: "4", reps: "30s"}, 
+                {name: "Tabletop toe taps", sets: "4", reps: "30s"}, 
+                {name: "Side planks / bird dogs", sets: "4", reps: "30s"}, 
+                {name: "Bycicle twists", sets: "3", reps: "50"}, 
+                {name: "Hanging knee raises", sets: "3", reps: "10-15"}, 
+                {name: "DB deadbug", sets: "3", reps: "10-15"}, 
+                {name: "Flutter kicks", sets: "3", reps: "10-15"}, 
+                {name: "Side plank", sets: "3", reps: "30s"}
+            ]
+        ];
+
+        function getExerciseDetails(exName) {
+            for (let day of mimiPlanData) {
+                const ex = day.find(e => e.name === exName);
+                if (ex) return ex;
+            }
+            return null;
+        }
+
         const categorizedExercises = {
             "🦵 Legs": ["Goblet Squats", "Bulgarian Split Squats", "Leg Extension", "Leg Curl", "Deadlifts", "Banded donkey kicks", "Side-lying clamshells", "Prone leg curl machine", "Seated leg extension", "Seated hip abductor machine", "Seated hip adductor machine", "Single-leg glute bridge"],
             "🔙 Back & Biceps": ["Dead Hangs", "Scapular Pull-ups", "Lat Pulldown", "Biceps Curls", "Australian Rows", "Banded Pull-ups", "Eccentric Pull-ups", "Chest-supported row", "Seated lat pulldown", "Seated incline dumbbell curls", "Seated hammer curls", "Assisted pull-ups / negatives", "Seated neutral-grip lat pulldown", "Straight-arm cable pulldown", "Seated biceps curls"],
@@ -342,7 +412,9 @@
                 document.getElementById('user-info').classList.remove('hidden');
                 document.getElementById('app-content').classList.remove('hidden');
                 
-                if(isMimi) document.getElementById('tab-rehab').classList.remove('hidden');
+                if(isMimi) {
+                    document.getElementById('tab-rehab').classList.remove('hidden');
+                }
                 
                 initApp();
             } else {
@@ -483,7 +555,6 @@
             const docRef = doc(db, `users/${currentUser.uid}/plannedWorkouts`, dateStr);
             const docSnap = await getDoc(docRef);
             
-            // Format object standard
             const formatEx = (ex) => typeof ex === 'string' ? {name: ex, sets: "", reps: "", weight: ""} : ex;
 
             if (docSnap.exists() && docSnap.data().exercises && docSnap.data().exercises.length > 0) {
@@ -637,7 +708,6 @@
             renderWorkoutCards();
         };
         
-        // --- MODAL DERNIÈRE SÉANCE ---
         window.openLastSession = (exName) => {
             const dateLimit = new Date(currentWorkoutDate);
             dateLimit.setHours(0,0,0,0);
@@ -648,7 +718,6 @@
                 return;
             }
             
-            // Trouver la date max
             let maxDate = new Date(0);
             pastLogs.forEach(l => { if (l.ts.toDate() > maxDate) maxDate = l.ts.toDate(); });
             const maxDateStr = maxDate.toDateString();
@@ -684,7 +753,7 @@
             const targetDateStr = currentWorkoutDate.toDateString();
             const targetLogs = allLogs.filter(l => l.ts && new Date(l.ts.toDate()).toDateString() === targetDateStr);
 
-            let exercisesToShow = [...currentWorkoutExercises]; // Array of objects
+            let exercisesToShow = [...currentWorkoutExercises]; 
             let loggedExNames = [...new Set(targetLogs.map(l => l.exercise))];
             
             loggedExNames.forEach(exName => {
@@ -701,24 +770,28 @@
             }
 
             exercisesToShow.forEach((exObj, exIndex) => {
-                const exName = exObj.name;
+                const isString = typeof exObj === 'string';
+                const exName = isString ? exObj : exObj.name;
+                
                 const exLogs = targetLogs.filter(l => l.exercise === exName).reverse(); 
                 const safeName = exName.replace(/'/g, "\\'");
                 
                 const card = document.createElement('div');
                 card.className = "exercise-card";
                 
-                const targetSets = parseInt(exObj.sets) || 0;
+                // --- RÉCUPÉRATION CORRIGÉE DES OBJECTIFS DE SETS ---
+                const defaultDetails = getExerciseDetails(exName) || {};
+                const pSets = (!isString && exObj.sets) ? exObj.sets : defaultDetails.sets || "";
+                const pReps = (!isString && exObj.reps) ? exObj.reps : defaultDetails.reps || "";
                 
-                // Formater l'affichage des infos du plan (Set, Reps, Poids/PDC)
-                let planInfoArr = [];
-                if (exObj.sets) planInfoArr.push(`${exObj.sets} Sets`);
-                if (exObj.reps) planInfoArr.push(`${exObj.reps} Reps`);
-                if (exObj.weight !== undefined && exObj.weight !== "") {
-                    planInfoArr.push((exObj.weight == 0 || exObj.weight === '0' || String(exObj.weight).toUpperCase() === 'PDC') ? 'PDC' : `${exObj.weight} kg`);
+                const targetSets = parseInt(pSets) || 0;
+                
+                let planHTML = "";
+                if (pSets && pReps) {
+                    planHTML = `<span class="text-xs font-bold text-violet-400 bg-violet-900/30 px-2 py-1 rounded-md ml-2">${pSets} Sets &times; ${pReps}</span>`;
+                } else if (pSets) {
+                    planHTML = `<span class="text-xs font-bold text-violet-400 bg-violet-900/30 px-2 py-1 rounded-md ml-2">${pSets} Sets</span>`;
                 }
-                
-                let planHTML = planInfoArr.length > 0 ? `<div class="text-[10px] font-bold text-violet-400 bg-violet-900/30 px-2 py-1 rounded-md mt-1 inline-block">${planInfoArr.join(' <span class="text-violet-700">|</span> ')}</div>` : '';
                 
                 let html = `
                     <div class="flex justify-between items-start mb-4">
@@ -777,22 +850,20 @@
                 });
 
                 const nextSetNum = exLogs.length + 1;
-                // Suggestion de poids : plan -> last rep -> vide
+                
                 let suggestedWeight = '';
                 if(exLogs.length > 0) {
                     suggestedWeight = exLogs[exLogs.length-1].weight;
-                } else if (exObj.weight !== undefined && exObj.weight !== "") {
+                } else if (!isString && exObj.weight !== undefined && exObj.weight !== "") {
                     suggestedWeight = exObj.weight;
                 }
-                
                 let suggestedWeightDisplay = (suggestedWeight == 0 || String(suggestedWeight).toUpperCase() === 'PDC') ? 'PDC' : suggestedWeight;
                 
                 let suggestedReps = '';
                 if (exLogs.length > 0) {
                     suggestedReps = exLogs[exLogs.length-1].reps;
-                } else if (exObj.reps) {
-                    // Si on a "8-12", on prend le premier chiffre pour préremplir (ex: 8)
-                    let match = String(exObj.reps).match(/\d+/);
+                } else if (pReps) {
+                    let match = String(pReps).match(/\d+/);
                     suggestedReps = match ? match[0] : '';
                 }
                 
@@ -834,7 +905,6 @@
             
             const reps = parseInt(repsInput.value) || 0;
             const weightVal = weightInput.value;
-            // Si le champ est "PDC" ou vide ou 0 -> 0.
             const weight = (weightVal.toUpperCase() === 'PDC' || parseFloat(weightVal) === 0 || weightVal === '') ? 0 : parseFloat(weightVal.replace(',', '.'));
 
             if (reps === 0) {
@@ -862,12 +932,16 @@
             if(exos.length === 0) return alert("Cette séance est vide ! Ajoute des exercices avant d'envoyer.");
             
             try {
-                await setDoc(doc(db, "shared", "partner_sync"), {
+                const payload = {
                     sender: currentUser.displayName || "Ton partenaire",
                     date: selectedPlanDateStr,
-                    exercises: exos, // Array d'objets (name, sets, reps, weight)
+                    exercises: exos,
                     ts: serverTimestamp()
-                });
+                };
+                if(weekPlansData[selectedPlanDateStr].sessionName) {
+                    payload.sessionName = weekPlansData[selectedPlanDateStr].sessionName;
+                }
+                await setDoc(doc(db, "shared", "partner_sync"), payload);
                 alert("Séance envoyée ! Ton partenaire peut maintenant la récupérer.");
             } catch (e) { alert("Erreur lors de l'envoi de la séance."); }
         };
@@ -881,10 +955,13 @@
                     const d = new Date(dParts[0], dParts[1]-1, dParts[2]).toLocaleDateString('fr-FR', {weekday: 'long', day: 'numeric', month: 'long'});
                     
                     if(confirm(`Récupérer la séance du ${d} envoyée par ${data.sender} ?\n(Cela sera placé exactement à cette date dans ton plan, avec les objectifs de séries/poids)`)) {
-                        await setDoc(doc(db, `users/${currentUser.uid}/plannedWorkouts`, data.date), {
+                        const payload = {
                             exercises: data.exercises,
                             completed: false
-                        }, { merge: true });
+                        };
+                        if(data.sessionName) payload.sessionName = data.sessionName;
+                        
+                        await setDoc(doc(db, `users/${currentUser.uid}/plannedWorkouts`, data.date), payload, { merge: true });
                         loadWeekView();
                         if(data.date === getLocalDateStr(currentWorkoutDate)) loadWorkoutForDate();
                         alert("Séance importée à la date prévue !");
@@ -928,11 +1005,7 @@
                 if (docSnap.exists()) {
                     if (docSnap.data().exercises) weekPlansData[dStr] = docSnap.data().exercises.map(formatEx);
                     weekCompletedData[dStr] = !!docSnap.data().completed;
-                    
-                    // Stockage du nom de séance
-                    if(docSnap.data().sessionName) {
-                        weekPlansData[dStr].sessionName = docSnap.data().sessionName;
-                    }
+                    if(docSnap.data().sessionName) weekPlansData[dStr].sessionName = docSnap.data().sessionName;
                 } else {
                     weekPlansData[dStr] = [];
                     weekCompletedData[dStr] = false;
@@ -978,7 +1051,6 @@
             document.getElementById('editor-date-label').innerText = `Édition : ${dayName} ${dayNum}`;
             document.getElementById('shift-date').value = dateStr; 
             
-            // Nom de séance
             const sessName = weekPlansData[dateStr]?.sessionName || "";
             document.getElementById('plan-session-name').value = sessName;
 
@@ -1065,7 +1137,6 @@
         async function savePlanToDB(dateStr, exosArr) {
             const payload = { exercises: exosArr };
             if(exosArr.sessionName) payload.sessionName = exosArr.sessionName;
-            
             await setDoc(doc(db, `users/${currentUser.uid}/plannedWorkouts`, dateStr), payload, { merge: true });
             if(dateStr === getLocalDateStr(currentWorkoutDate)) loadWorkoutForDate();
         }
