@@ -34,7 +34,7 @@
         }
         
         .set-row {
-            display: grid; grid-template-columns: 1fr 2fr 10px 2fr 3.5fr;
+            display: grid; grid-template-columns: 1fr 2fr 10px 2.5fr 3fr;
             align-items: center; gap: 0.5rem; margin-bottom: 0.75rem;
         }
     </style>
@@ -65,7 +65,7 @@
             <div class="mb-6 flex items-center justify-between bg-[#1c1c1e] p-4 rounded-2xl shadow-lg border border-[#333]">
                 <button onclick="changeWorkoutDate(-1)" class="bg-[#2c2c2e] w-10 h-10 rounded-full flex items-center justify-center font-bold text-slate-300 hover:text-white transition">&larr;</button>
                 <div class="text-center flex-1">
-                    <h2 class="text-xl font-black text-white capitalize" id="workout-day-title">Aujourd'hui</h2>
+                    <h2 class="text-xl font-black text-white capitalize" id="workout-day-title">Séance du Jour</h2>
                     <p class="text-slate-400 text-xs font-medium uppercase tracking-wider mt-1" id="current-date-display">Date</p>
                 </div>
                 <button onclick="changeWorkoutDate(1)" class="bg-[#2c2c2e] w-10 h-10 rounded-full flex items-center justify-center font-bold text-slate-300 hover:text-white transition">&rarr;</button>
@@ -117,12 +117,18 @@
                     📥 Vérifier les partages reçus
                 </button>
 
+                <!-- Éditeur de jour -->
                 <div id="day-editor" class="hidden bg-[#121212] border border-[#333] p-5 rounded-2xl relative">
-                    <div class="flex justify-between items-center mb-5">
+                    <div class="flex justify-between items-center mb-4">
                         <h3 id="editor-date-label" class="text-white font-black text-lg">Lundi 12</h3>
                         <button onclick="closeDayEditor()" class="text-slate-500 font-black text-2xl hover:text-white bg-[#1c1c1e] w-8 h-8 rounded-full flex items-center justify-center pb-1">&times;</button>
                     </div>
                     
+                    <!-- Nom de la séance -->
+                    <div class="mb-5">
+                        <input type="text" id="plan-session-name" onchange="saveSessionName()" placeholder="Nommer la séance (ex: Push Day)..." class="w-full bg-[#1c1c1e] border border-[#333] text-violet-300 font-bold rounded-xl p-3 outline-none focus:border-violet-500 text-sm">
+                    </div>
+
                     <div class="mb-5">
                         <div id="planned-exercises-list" class="space-y-3 mb-2 min-h-[40px]"></div>
                     </div>
@@ -209,6 +215,26 @@
 
     </div>
 
+    <!-- Modal: Dernière Séance -->
+    <div id="last-session-modal" class="hidden fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4">
+        <div class="bg-[#1c1c1e] border border-[#333] rounded-2xl w-full max-w-sm p-6 relative shadow-2xl">
+            <button onclick="closeLastSessionModal()" class="absolute top-4 right-4 text-slate-500 hover:text-white text-2xl font-black">&times;</button>
+            <h3 id="modal-ls-title" class="text-white font-black text-lg mb-1 pr-6">Exercice</h3>
+            <p id="modal-ls-date" class="text-violet-400 text-xs font-bold uppercase tracking-wider mb-4">Date</p>
+            
+            <div class="bg-[#121212] border border-[#333] rounded-xl p-4">
+                <div class="grid grid-cols-3 gap-2 mb-2 pb-2 border-b border-[#333] text-[10px] font-bold text-slate-500 uppercase tracking-wider text-center">
+                    <div>Set</div>
+                    <div>Reps</div>
+                    <div>Poids</div>
+                </div>
+                <div id="modal-ls-content" class="space-y-2">
+                    <!-- Généré en JS -->
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Bottom Navigation Bar -->
     <nav class="fixed bottom-0 w-full bg-[#121212]/95 backdrop-blur-lg border-t border-[#222] pb-safe z-50">
         <div class="flex justify-around items-center h-20 px-2 pb-2">
@@ -251,6 +277,7 @@
         const db = getFirestore(app);
         const auth = getAuth(app);
         const provider = new GoogleAuthProvider();
+        
         provider.setCustomParameters({ prompt: 'select_account' });
 
         let currentUser = null;
@@ -266,7 +293,7 @@
         let chartInstance = null;
         
         let currentWorkoutDate = new Date();
-        let currentWorkoutExercises = [];
+        let currentWorkoutExercises = []; // Tableau d'objets : {name, sets, reps, weight}
         
         window.forceShowInput = {}; 
         window.editingLogId = null;
@@ -293,6 +320,7 @@
         }
         currentWeekStartDate = getMonday(new Date());
 
+        // --- AUTH ---
         document.getElementById('btn-login').addEventListener('click', async () => {
             try {
                 await setPersistence(auth, browserLocalPersistence);
@@ -340,6 +368,7 @@
                 renderWorkoutHistory();
             }
             if(tab === 'plan') loadWeekView();
+            if(tab === 'workout') loadWorkoutForDate();
         };
 
         function initApp() {
@@ -353,6 +382,7 @@
                 allNotes = {};
                 snap.forEach(doc => { allNotes[doc.id] = doc.data().note; });
                 if(!document.getElementById('view-progress').classList.contains('hidden')) renderWorkoutHistory();
+                if(!document.getElementById('view-workout').classList.contains('hidden')) loadWorkoutForDate();
             });
 
             const logsQuery = query(collection(db, `users/${currentUser.uid}/workoutLogs`), orderBy('ts', 'desc'));
@@ -453,18 +483,15 @@
             const docRef = doc(db, `users/${currentUser.uid}/plannedWorkouts`, dateStr);
             const docSnap = await getDoc(docRef);
             
-            if (dateStr === getLocalDateStr(new Date())) {
-                document.getElementById('workout-day-title').innerText = "Aujourd'hui";
-            } else {
-                document.getElementById('workout-day-title').innerText = currentWorkoutDate.toLocaleDateString('fr-FR', {weekday: 'long'});
-            }
-            document.getElementById('current-date-display').innerText = currentWorkoutDate.toLocaleDateString('fr-FR', {day: 'numeric', month: 'long', year: 'numeric'});
-
-            let isCompleted = false;
+            // Format object standard
+            const formatEx = (ex) => typeof ex === 'string' ? {name: ex, sets: "", reps: "", weight: ""} : ex;
 
             if (docSnap.exists() && docSnap.data().exercises && docSnap.data().exercises.length > 0) {
-                currentWorkoutExercises = docSnap.data().exercises;
-                isCompleted = !!docSnap.data().completed;
+                currentWorkoutExercises = docSnap.data().exercises.map(formatEx);
+                let sessionName = docSnap.data().sessionName || "Séance du Jour";
+                let isCompleted = !!docSnap.data().completed;
+                
+                document.getElementById('workout-day-title').innerText = sessionName;
                 
                 if (isCompleted) {
                     document.getElementById('workout-status-badge').innerText = `Terminée 🏆`;
@@ -473,14 +500,8 @@
                     document.getElementById('workout-status-badge').innerText = `${currentWorkoutExercises.length} Exercices`;
                     document.getElementById('workout-status-badge').className = "bg-violet-600/20 text-violet-400 border border-violet-500/30 text-xs px-3 py-1 rounded-full font-bold";
                 }
-            } else {
-                currentWorkoutExercises = [];
-                document.getElementById('workout-status-badge').innerText = "Aucun plan";
-                document.getElementById('workout-status-badge').className = "bg-slate-800 text-slate-400 text-xs px-3 py-1 rounded-full font-bold";
-            }
-
-            const btnComplete = document.getElementById('btn-complete-workout');
-            if (currentWorkoutExercises.length > 0) {
+                
+                const btnComplete = document.getElementById('btn-complete-workout');
                 btnComplete.classList.remove('hidden');
                 if (isCompleted) {
                     btnComplete.innerText = "✅ Séance Terminée (Annuler)";
@@ -490,7 +511,17 @@
                     btnComplete.className = "mt-6 bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-4 rounded-2xl font-black text-sm uppercase tracking-wider transition w-full shadow-lg shadow-emerald-900/50";
                 }
             } else {
-                btnComplete.classList.add('hidden');
+                currentWorkoutExercises = [];
+                document.getElementById('workout-day-title').innerText = "Jour de Repos";
+                document.getElementById('workout-status-badge').innerText = "Aucun plan";
+                document.getElementById('workout-status-badge').className = "bg-slate-800 text-slate-400 text-xs px-3 py-1 rounded-full font-bold";
+                document.getElementById('btn-complete-workout').classList.add('hidden');
+            }
+
+            if (dateStr === getLocalDateStr(new Date())) {
+                document.getElementById('current-date-display').innerText = "Aujourd'hui";
+            } else {
+                document.getElementById('current-date-display').innerText = currentWorkoutDate.toLocaleDateString('fr-FR', {weekday: 'long', day: 'numeric', month: 'long'});
             }
             
             if (allNotes[dateStr]) {
@@ -537,10 +568,10 @@
         };
 
         window.addExerciseToWorkout = async () => {
-            const ex = document.getElementById('today-add-ex-select').value;
-            if(!ex) return;
-            if(!currentWorkoutExercises.includes(ex)) {
-                currentWorkoutExercises.push(ex);
+            const exName = document.getElementById('today-add-ex-select').value;
+            if(!exName) return;
+            if(!currentWorkoutExercises.find(e => e.name === exName)) {
+                currentWorkoutExercises.push({name: exName, sets: "", reps: "", weight: ""});
                 const dateStr = getLocalDateStr(currentWorkoutDate);
                 await setDoc(doc(db, `users/${currentUser.uid}/plannedWorkouts`, dateStr), {
                     exercises: currentWorkoutExercises
@@ -552,7 +583,7 @@
         window.removeExerciseFromWorkout = async (exName) => {
             if(!confirm(`Retirer ${exName} de cette séance ?\n(Cela supprimera aussi les séries enregistrées pour cet exo à cette date)`)) return;
             
-            currentWorkoutExercises = currentWorkoutExercises.filter(e => e !== exName);
+            currentWorkoutExercises = currentWorkoutExercises.filter(e => e.name !== exName);
             const dateStr = getLocalDateStr(currentWorkoutDate);
             await setDoc(doc(db, `users/${currentUser.uid}/plannedWorkouts`, dateStr), {
                 exercises: currentWorkoutExercises
@@ -582,7 +613,8 @@
             const weightInput = document.getElementById(`edit-weight-${logId}`);
             
             const newReps = parseInt(repsInput.value);
-            const newWeight = parseFloat(weightInput.value);
+            const weightVal = weightInput.value;
+            const newWeight = (weightVal.toUpperCase() === 'PDC' || parseFloat(weightVal) === 0) ? 0 : parseFloat(weightVal.replace(',', '.'));
             
             if (!isNaN(newReps) && !isNaN(newWeight)) {
                 try {
@@ -604,6 +636,46 @@
             window.forceShowInput[safeName] = true;
             renderWorkoutCards();
         };
+        
+        // --- MODAL DERNIÈRE SÉANCE ---
+        window.openLastSession = (exName) => {
+            const dateLimit = new Date(currentWorkoutDate);
+            dateLimit.setHours(0,0,0,0);
+            
+            let pastLogs = allLogs.filter(l => l.exercise === exName && l.ts && l.ts.toDate() < dateLimit);
+            if (pastLogs.length === 0) {
+                alert("Aucune séance précédente trouvée pour cet exercice.");
+                return;
+            }
+            
+            // Trouver la date max
+            let maxDate = new Date(0);
+            pastLogs.forEach(l => { if (l.ts.toDate() > maxDate) maxDate = l.ts.toDate(); });
+            const maxDateStr = maxDate.toDateString();
+            
+            let lastSessionLogs = pastLogs.filter(l => l.ts.toDate().toDateString() === maxDateStr).reverse();
+            
+            document.getElementById('modal-ls-title').innerText = exName;
+            document.getElementById('modal-ls-date').innerText = maxDate.toLocaleDateString('fr-FR', {weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'});
+            
+            let contentHTML = '';
+            lastSessionLogs.forEach((log, idx) => {
+                const weightText = (log.weight === 0 || log.weight === '0') ? "PDC" : `${log.weight} kg`;
+                contentHTML += `
+                    <div class="grid grid-cols-3 gap-2 items-center text-center bg-[#1c1c1e] p-2 rounded-lg border border-[#333]">
+                        <div class="text-xs font-bold text-violet-400">Set ${idx+1}</div>
+                        <div class="text-sm font-black text-white">${log.reps}</div>
+                        <div class="text-sm font-black text-white">${weightText}</div>
+                    </div>
+                `;
+            });
+            document.getElementById('modal-ls-content').innerHTML = contentHTML;
+            document.getElementById('last-session-modal').classList.remove('hidden');
+        };
+        
+        window.closeLastSessionModal = () => {
+            document.getElementById('last-session-modal').classList.add('hidden');
+        };
 
         function renderWorkoutCards() {
             const container = document.getElementById('workout-exercises-container');
@@ -612,10 +684,11 @@
             const targetDateStr = currentWorkoutDate.toDateString();
             const targetLogs = allLogs.filter(l => l.ts && new Date(l.ts.toDate()).toDateString() === targetDateStr);
 
-            let exercisesToShow = [...currentWorkoutExercises];
+            let exercisesToShow = [...currentWorkoutExercises]; // Array of objects
             let loggedExNames = [...new Set(targetLogs.map(l => l.exercise))];
-            loggedExNames.forEach(ex => {
-                if(!exercisesToShow.includes(ex)) exercisesToShow.push(ex);
+            
+            loggedExNames.forEach(exName => {
+                if(!exercisesToShow.find(e => e.name === exName)) exercisesToShow.push({name: exName, sets: "", reps: "", weight: ""});
             });
 
             if(exercisesToShow.length === 0) {
@@ -627,27 +700,34 @@
                 return;
             }
 
-            exercisesToShow.forEach((exName, exIndex) => {
+            exercisesToShow.forEach((exObj, exIndex) => {
+                const exName = exObj.name;
                 const exLogs = targetLogs.filter(l => l.exercise === exName).reverse(); 
-                const lastPerfLog = allLogs.find(l => l.exercise === exName && l.ts && new Date(l.ts.toDate()) < currentWorkoutDate);
                 const safeName = exName.replace(/'/g, "\\'");
                 
                 const card = document.createElement('div');
                 card.className = "exercise-card";
                 
-                let perfHTML = lastPerfLog 
-                    ? `<div class="text-xs font-semibold text-slate-400 mt-1">Dernière perf: <span class="text-white">${lastPerfLog.weight}kg &times; ${lastPerfLog.reps}</span></div>` 
-                    : '';
+                const targetSets = parseInt(exObj.sets) || 0;
+                
+                // Formater l'affichage des infos du plan (Set, Reps, Poids/PDC)
+                let planInfoArr = [];
+                if (exObj.sets) planInfoArr.push(`${exObj.sets} Sets`);
+                if (exObj.reps) planInfoArr.push(`${exObj.reps} Reps`);
+                if (exObj.weight !== undefined && exObj.weight !== "") {
+                    planInfoArr.push((exObj.weight == 0 || exObj.weight === '0' || String(exObj.weight).toUpperCase() === 'PDC') ? 'PDC' : `${exObj.weight} kg`);
+                }
+                
+                let planHTML = planInfoArr.length > 0 ? `<div class="text-[10px] font-bold text-violet-400 bg-violet-900/30 px-2 py-1 rounded-md mt-1 inline-block">${planInfoArr.join(' <span class="text-violet-700">|</span> ')}</div>` : '';
                 
                 let html = `
                     <div class="flex justify-between items-start mb-4">
-                        <div>
-                            <div class="flex items-center">
-                                <h3 class="font-black text-lg text-white leading-tight">${exName}</h3>
-                            </div>
-                            ${perfHTML}
+                        <div class="flex-1">
+                            <h3 class="font-black text-lg text-white leading-tight">${exName}</h3>
+                            ${planHTML}
+                            <button onclick="openLastSession('${safeName}')" class="block text-[10px] text-slate-400 underline mt-2 hover:text-white transition">🕒 Voir la dernière séance</button>
                         </div>
-                        <button onclick="removeExerciseFromWorkout('${safeName}')" class="text-slate-500 hover:text-red-500 px-2 text-2xl leading-none">&times;</button>
+                        <button onclick="removeExerciseFromWorkout('${safeName}')" class="text-slate-500 hover:text-red-500 px-2 text-2xl leading-none ml-2">&times;</button>
                     </div>
                     
                     <div class="space-y-2 mb-4">
@@ -655,19 +735,24 @@
                             <div class="text-[10px] font-bold uppercase tracking-wider text-center">Set</div>
                             <div class="text-[10px] font-bold uppercase tracking-wider text-center">Reps</div>
                             <div></div>
-                            <div class="text-[10px] font-bold uppercase tracking-wider text-center">Kgs</div>
+                            <div class="text-[10px] font-bold uppercase tracking-wider text-center">Kgs/Pdc</div>
                             <div></div>
                         </div>
                 `;
 
                 exLogs.forEach((log, idx) => {
+                    const weightDisplay = (log.weight === 0 || log.weight === "0") ? "PDC" : log.weight;
+                    
                     if (window.editingLogId === log.id) {
                         html += `
                             <div class="set-row bg-[#1c1c1e] rounded-xl px-2 py-2 border border-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.3)]">
                                 <div class="w-6 h-6 rounded-full bg-blue-600/30 text-blue-400 flex items-center justify-center text-xs font-black mx-auto">${idx + 1}</div>
                                 <div><input type="number" inputmode="numeric" id="edit-reps-${log.id}" class="log-input text-base py-1 px-0" value="${log.reps}"></div>
                                 <div class="text-slate-600 text-xs font-bold text-center">&times;</div>
-                                <div><input type="number" inputmode="decimal" id="edit-weight-${log.id}" class="log-input text-base py-1 px-0" value="${log.weight}"></div>
+                                <div class="relative w-full h-full flex items-center">
+                                    <input type="text" inputmode="decimal" id="edit-weight-${log.id}" class="log-input text-base py-1 pr-6 pl-1 w-full" value="${weightDisplay}">
+                                    <button onclick="document.getElementById('edit-weight-${log.id}').value='PDC'" class="absolute right-1 bg-[#333] text-[8px] font-black text-slate-300 rounded p-1">PDC</button>
+                                </div>
                                 <div class="flex justify-end items-center gap-3 pr-2">
                                     <button onclick="saveEdit('${log.id}')" class="text-blue-400 hover:text-blue-300 text-xl transition">💾</button>
                                     <button onclick="cancelEdit()" class="text-slate-500 hover:text-red-400 text-xl transition">&times;</button>
@@ -680,7 +765,7 @@
                                 <div class="w-6 h-6 rounded-full bg-violet-600/30 text-violet-400 flex items-center justify-center text-xs font-black mx-auto">${idx + 1}</div>
                                 <div class="text-center font-black text-white text-lg">${log.reps}</div>
                                 <div class="text-slate-600 text-xs font-bold text-center">&times;</div>
-                                <div class="text-center font-black text-white text-lg">${log.weight}</div>
+                                <div class="text-center font-black text-white text-lg">${weightDisplay}</div>
                                 <div class="flex justify-end items-center gap-2 pr-1">
                                     <span class="text-emerald-400 text-sm hidden sm:inline mr-1">✔</span>
                                     <button onclick="startEdit('${log.id}')" class="text-slate-500 hover:text-blue-400 text-lg transition">✏️</button>
@@ -692,26 +777,47 @@
                 });
 
                 const nextSetNum = exLogs.length + 1;
-                let suggestedWeight = exLogs.length > 0 ? exLogs[exLogs.length-1].weight : (lastPerfLog ? lastPerfLog.weight : '');
-                let suggestedReps = exLogs.length > 0 ? exLogs[exLogs.length-1].reps : (lastPerfLog ? lastPerfLog.reps : '');
+                // Suggestion de poids : plan -> last rep -> vide
+                let suggestedWeight = '';
+                if(exLogs.length > 0) {
+                    suggestedWeight = exLogs[exLogs.length-1].weight;
+                } else if (exObj.weight !== undefined && exObj.weight !== "") {
+                    suggestedWeight = exObj.weight;
+                }
                 
+                let suggestedWeightDisplay = (suggestedWeight == 0 || String(suggestedWeight).toUpperCase() === 'PDC') ? 'PDC' : suggestedWeight;
+                
+                let suggestedReps = '';
+                if (exLogs.length > 0) {
+                    suggestedReps = exLogs[exLogs.length-1].reps;
+                } else if (exObj.reps) {
+                    // Si on a "8-12", on prend le premier chiffre pour préremplir (ex: 8)
+                    let match = String(exObj.reps).match(/\d+/);
+                    suggestedReps = match ? match[0] : '';
+                }
+                
+                const isGoalReached = targetSets > 0 && exLogs.length >= targetSets;
                 const isForceShow = window.forceShowInput[exName] === true;
 
-                if (isForceShow || exLogs.length === 0) {
+                if (!isGoalReached || isForceShow) {
                     html += `
                             <div class="set-row">
                                 <div class="w-6 h-6 rounded-full bg-[#333] text-slate-400 flex items-center justify-center text-xs font-black mx-auto">${nextSetNum}</div>
                                 <div><input type="number" inputmode="numeric" id="reps-${exIndex}" class="log-input text-lg" value="${suggestedReps}" placeholder="0"></div>
                                 <div class="text-slate-600 text-xs font-bold text-center">&times;</div>
-                                <div><input type="number" inputmode="decimal" id="weight-${exIndex}" class="log-input text-lg" value="${suggestedWeight}" placeholder="0"></div>
+                                <div class="relative w-full h-full flex items-center">
+                                    <input type="text" inputmode="decimal" id="weight-${exIndex}" class="log-input text-lg w-full pr-8" value="${suggestedWeightDisplay}" placeholder="0">
+                                    <button onclick="document.getElementById('weight-${exIndex}').value='PDC'" class="absolute right-1 bg-[#333] text-[9px] font-black text-slate-300 rounded px-1.5 py-1">PDC</button>
+                                </div>
                                 <button onclick="saveSpecificSet('${safeName}', ${exIndex})" class="bg-[#2c2c2e] hover:bg-violet-600 text-white font-bold text-xs py-2 rounded-xl transition w-full shadow-md border border-[#444]">SAVE</button>
                             </div>
                         </div>
                     `;
                 } else {
                     html += `
-                            <div class="mt-4 p-3 bg-[#121212] border border-[#333] rounded-xl text-center">
-                                <button onclick="forceInputShow('${safeName}')" class="text-[10px] uppercase font-bold text-slate-400 hover:text-white underline">+ Ajouter une série</button>
+                            <div class="mt-4 p-3 bg-emerald-900/20 border border-emerald-500/20 rounded-xl text-center">
+                                <div class="text-emerald-400 font-black mb-2 flex justify-center items-center gap-2"><span>✅</span> Objectif Atteint !</div>
+                                <button onclick="forceInputShow('${safeName}')" class="text-[10px] uppercase font-bold text-slate-400 hover:text-white underline">+ Ajouter une série libre</button>
                             </div>
                         </div>
                     `;
@@ -727,7 +833,9 @@
             const weightInput = document.getElementById(`weight-${index}`);
             
             const reps = parseInt(repsInput.value) || 0;
-            const weight = parseFloat(weightInput.value) || 0;
+            const weightVal = weightInput.value;
+            // Si le champ est "PDC" ou vide ou 0 -> 0.
+            const weight = (weightVal.toUpperCase() === 'PDC' || parseFloat(weightVal) === 0 || weightVal === '') ? 0 : parseFloat(weightVal.replace(',', '.'));
 
             if (reps === 0) {
                 repsInput.classList.add('border-red-500');
@@ -757,7 +865,7 @@
                 await setDoc(doc(db, "shared", "partner_sync"), {
                     sender: currentUser.displayName || "Ton partenaire",
                     date: selectedPlanDateStr,
-                    exercises: exos,
+                    exercises: exos, // Array d'objets (name, sets, reps, weight)
                     ts: serverTimestamp()
                 });
                 alert("Séance envoyée ! Ton partenaire peut maintenant la récupérer.");
@@ -772,7 +880,7 @@
                     const dParts = data.date.split('-');
                     const d = new Date(dParts[0], dParts[1]-1, dParts[2]).toLocaleDateString('fr-FR', {weekday: 'long', day: 'numeric', month: 'long'});
                     
-                    if(confirm(`Récupérer la séance du ${d} envoyée par ${data.sender} ?\n(Cela sera placé exactement à cette date dans ton plan)`)) {
+                    if(confirm(`Récupérer la séance du ${d} envoyée par ${data.sender} ?\n(Cela sera placé exactement à cette date dans ton plan, avec les objectifs de séries/poids)`)) {
                         await setDoc(doc(db, `users/${currentUser.uid}/plannedWorkouts`, data.date), {
                             exercises: data.exercises,
                             completed: false
@@ -815,9 +923,16 @@
                 let dStr = getLocalDateStr(d);
                 
                 const docSnap = await getDoc(doc(db, `users/${currentUser.uid}/plannedWorkouts`, dStr));
+                const formatEx = (ex) => typeof ex === 'string' ? {name: ex, sets: "", reps: "", weight: ""} : ex;
+
                 if (docSnap.exists()) {
-                    if (docSnap.data().exercises) weekPlansData[dStr] = docSnap.data().exercises;
+                    if (docSnap.data().exercises) weekPlansData[dStr] = docSnap.data().exercises.map(formatEx);
                     weekCompletedData[dStr] = !!docSnap.data().completed;
+                    
+                    // Stockage du nom de séance
+                    if(docSnap.data().sessionName) {
+                        weekPlansData[dStr].sessionName = docSnap.data().sessionName;
+                    }
                 } else {
                     weekPlansData[dStr] = [];
                     weekCompletedData[dStr] = false;
@@ -863,6 +978,10 @@
             document.getElementById('editor-date-label').innerText = `Édition : ${dayName} ${dayNum}`;
             document.getElementById('shift-date').value = dateStr; 
             
+            // Nom de séance
+            const sessName = weekPlansData[dateStr]?.sessionName || "";
+            document.getElementById('plan-session-name').value = sessName;
+
             let lastWeek = new Date(dateStr);
             lastWeek.setDate(lastWeek.getDate() - 7);
             document.getElementById('copy-date').value = getLocalDateStr(lastWeek);
@@ -877,6 +996,19 @@
             selectedPlanDateStr = null;
         };
 
+        window.saveSessionName = async () => {
+            if(!selectedPlanDateStr) return;
+            const newName = document.getElementById('plan-session-name').value;
+            weekPlansData[selectedPlanDateStr].sessionName = newName;
+            await savePlanToDB(selectedPlanDateStr, weekPlansData[selectedPlanDateStr]);
+        };
+
+        window.updatePlanEx = async (idx, field, value) => {
+            if(!selectedPlanDateStr) return;
+            weekPlansData[selectedPlanDateStr][idx][field] = value;
+            await savePlanToDB(selectedPlanDateStr, weekPlansData[selectedPlanDateStr]);
+        };
+
         function renderEditorList() {
             const container = document.getElementById('planned-exercises-list');
             container.innerHTML = '';
@@ -884,14 +1016,28 @@
             if(exos.length === 0) {
                 container.innerHTML = '<span class="text-slate-500 text-xs italic">Aucun exercice prévu ce jour.</span>';
             } else {
-                exos.forEach((ex, idx) => {
+                exos.forEach((exObj, idx) => {
                     const div = document.createElement('div');
-                    div.className = "flex justify-between items-center bg-[#1c1c1e] p-3 rounded-xl border border-[#333]";
+                    div.className = "bg-[#1c1c1e] p-3 rounded-xl border border-[#333]";
                     div.innerHTML = `
-                        <div>
-                            <div class="text-sm font-semibold text-slate-200">${ex}</div>
+                        <div class="flex justify-between items-center mb-2">
+                            <div class="text-sm font-semibold text-slate-200">${exObj.name}</div>
+                            <button onclick="removeExerciseFromPlan(${idx})" class="text-slate-500 hover:text-red-400 text-2xl leading-none">&times;</button>
                         </div>
-                        <button onclick="removeExerciseFromPlan(${idx})" class="text-slate-500 hover:text-red-400 text-2xl leading-none">&times;</button>
+                        <div class="flex gap-2">
+                            <div class="flex-1">
+                                <label class="text-[9px] font-bold text-slate-500 uppercase px-1">Sets</label>
+                                <input type="number" inputmode="numeric" placeholder="Sets" class="w-full bg-[#121212] text-white text-xs p-2 rounded-lg border border-[#333] focus:border-violet-500 outline-none text-center" value="${exObj.sets || ''}" onchange="updatePlanEx(${idx}, 'sets', this.value)">
+                            </div>
+                            <div class="flex-1">
+                                <label class="text-[9px] font-bold text-slate-500 uppercase px-1">Reps</label>
+                                <input type="text" placeholder="Reps" class="w-full bg-[#121212] text-white text-xs p-2 rounded-lg border border-[#333] focus:border-violet-500 outline-none text-center" value="${exObj.reps || ''}" onchange="updatePlanEx(${idx}, 'reps', this.value)">
+                            </div>
+                            <div class="flex-1">
+                                <label class="text-[9px] font-bold text-slate-500 uppercase px-1">Poids</label>
+                                <input type="text" placeholder="Kg/PDC" class="w-full bg-[#121212] text-white text-xs p-2 rounded-lg border border-[#333] focus:border-violet-500 outline-none text-center" value="${exObj.weight || ''}" onchange="updatePlanEx(${idx}, 'weight', this.value)">
+                            </div>
+                        </div>
                     `;
                     container.appendChild(div);
                 });
@@ -899,10 +1045,11 @@
         }
 
         window.addExerciseToPlan = async () => {
-            const ex = document.getElementById('add-ex-select').value;
-            if(!ex || !selectedPlanDateStr) return;
+            const exName = document.getElementById('add-ex-select').value;
+            if(!exName || !selectedPlanDateStr) return;
             if(!weekPlansData[selectedPlanDateStr]) weekPlansData[selectedPlanDateStr] = [];
-            weekPlansData[selectedPlanDateStr].push(ex);
+            
+            weekPlansData[selectedPlanDateStr].push({name: exName, sets: "", reps: "", weight: ""});
             await savePlanToDB(selectedPlanDateStr, weekPlansData[selectedPlanDateStr]);
             renderEditorList();
             loadWeekView(); 
@@ -916,7 +1063,10 @@
         };
 
         async function savePlanToDB(dateStr, exosArr) {
-            await setDoc(doc(db, `users/${currentUser.uid}/plannedWorkouts`, dateStr), { exercises: exosArr }, { merge: true });
+            const payload = { exercises: exosArr };
+            if(exosArr.sessionName) payload.sessionName = exosArr.sessionName;
+            
+            await setDoc(doc(db, `users/${currentUser.uid}/plannedWorkouts`, dateStr), payload, { merge: true });
             if(dateStr === getLocalDateStr(currentWorkoutDate)) loadWorkoutForDate();
         }
 
@@ -929,8 +1079,12 @@
 
             if(confirm(`Déplacer ces ${exosToMove.length} exercices au ${targetDateStr} ?`)) {
                 try {
-                    await setDoc(doc(db, `users/${currentUser.uid}/plannedWorkouts`, targetDateStr), { exercises: exosToMove }, { merge: true });
+                    const payload = { exercises: exosToMove };
+                    if(exosToMove.sessionName) payload.sessionName = exosToMove.sessionName;
+
+                    await setDoc(doc(db, `users/${currentUser.uid}/plannedWorkouts`, targetDateStr), payload, { merge: true });
                     await deleteDoc(doc(db, `users/${currentUser.uid}/plannedWorkouts`, selectedPlanDateStr));
+                    
                     weekPlansData[selectedPlanDateStr] = []; 
                     closeDayEditor();
                     loadWeekView(); 
@@ -949,10 +1103,17 @@
                     const sourceExos = docSnap.data().exercises;
                     if(confirm(`Copier les ${sourceExos.length} exercices du ${sourceDateStr} vers le ${selectedPlanDateStr} ?`)) {
                         weekPlansData[selectedPlanDateStr] = [...sourceExos];
-                        await setDoc(doc(db, `users/${currentUser.uid}/plannedWorkouts`, selectedPlanDateStr), {
-                            exercises: weekPlansData[selectedPlanDateStr]
-                        }, { merge: true });
+                        
+                        const payload = { exercises: weekPlansData[selectedPlanDateStr] };
+                        if(docSnap.data().sessionName) {
+                            payload.sessionName = docSnap.data().sessionName;
+                            weekPlansData[selectedPlanDateStr].sessionName = payload.sessionName;
+                        }
+
+                        await setDoc(doc(db, `users/${currentUser.uid}/plannedWorkouts`, selectedPlanDateStr), payload, { merge: true });
                         renderEditorList();
+                        document.getElementById('plan-session-name').value = payload.sessionName || "";
+                        
                         loadWeekView();
                         if(selectedPlanDateStr === getLocalDateStr(currentWorkoutDate)) loadWorkoutForDate();
                     }
@@ -1019,7 +1180,11 @@
                 
                 let exHtml = '';
                 for(let ex in exMap) {
-                    const setsStr = exMap[ex].map(s => `${s.weight}kg &times; ${s.reps}`).join(' <span class="text-slate-600">|</span> ');
+                    const setsStr = exMap[ex].map(s => {
+                        let w = (s.weight == 0 || s.weight === "0") ? "PDC" : `${s.weight}kg`;
+                        return `${w} &times; ${s.reps}`;
+                    }).join(' <span class="text-slate-600">|</span> ');
+                    
                     exHtml += `
                         <div class="mb-2 bg-[#121212] p-2 rounded-lg border border-[#333]">
                             <span class="text-[11px] font-black text-violet-400 block mb-1 uppercase tracking-wider">${ex}</span>
