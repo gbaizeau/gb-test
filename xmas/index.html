@@ -43,7 +43,7 @@
 
     <!-- Top Header -->
     <header class="pt-12 pb-4 px-6 flex justify-between items-center sticky top-0 bg-[#121212]/90 backdrop-blur-md z-50">
-        <h1 class="text-2xl font-black tracking-tight" id="header-title">Aujourd'hui</h1>
+        <h1 class="text-2xl font-black tracking-tight" id="header-title">Séance</h1>
         <div id="auth-container">
             <button id="btn-login" class="bg-violet-600 text-white px-4 py-1.5 rounded-full text-sm font-bold shadow-lg">Connexion</button>
             <div id="user-info" class="hidden flex items-center space-x-3">
@@ -60,32 +60,40 @@
         
         <!-- TAB 1: WORKOUT -->
         <div id="view-workout">
-            <div class="mb-6 flex justify-between items-end">
-                <div>
-                    <p class="text-slate-400 text-sm font-medium uppercase tracking-wider mb-1" id="current-date-display">Date</p>
-                    <h2 class="text-3xl font-black text-white" id="workout-day-title">Séance Libre</h2>
+            
+            <!-- Navigation par Date -->
+            <div class="mb-4 flex justify-between items-center bg-[#1c1c1e] p-4 rounded-2xl shadow-lg border border-[#333]">
+                <button onclick="changeWorkoutDate(-1)" class="bg-[#2c2c2e] w-10 h-10 rounded-full flex items-center justify-center font-bold text-slate-300 hover:text-white transition">&larr;</button>
+                <div class="text-center">
+                    <p class="text-violet-400 text-[10px] font-bold uppercase tracking-widest mb-1" id="workout-day-title">Aujourd'hui</p>
+                    <h2 class="text-lg font-black text-white capitalize" id="workout-date-display">Date</h2>
                 </div>
-                <div id="workout-status-badge" class="bg-slate-800 text-slate-300 text-xs px-3 py-1 rounded-full font-bold">
+                <button onclick="changeWorkoutDate(1)" class="bg-[#2c2c2e] w-10 h-10 rounded-full flex items-center justify-center font-bold text-slate-300 hover:text-white transition">&rarr;</button>
+            </div>
+
+            <!-- Badge Statut -->
+            <div class="flex justify-center mb-6">
+                <div id="workout-status-badge" class="bg-slate-800 text-slate-300 text-xs px-4 py-1.5 rounded-full font-bold shadow-md">
                     0 Exercices
                 </div>
             </div>
 
-            <!-- Liste des exercices du jour -->
+            <!-- Liste des exercices -->
             <div id="workout-exercises-container" class="space-y-4"></div>
             
             <!-- Bloc Ajout d'Exercice -->
             <div class="mt-6 bg-[#1c1c1e] border border-[#333] p-4 rounded-2xl shadow-lg">
-                <p class="text-[10px] font-bold text-slate-400 mb-3 uppercase tracking-widest pl-1">Ajouter à aujourd'hui</p>
+                <p class="text-[10px] font-bold text-slate-400 mb-3 uppercase tracking-widest pl-1">Ajouter à cette séance</p>
                 <div class="flex space-x-2">
                     <select id="today-add-ex-select" class="flex-1 bg-[#121212] border border-[#333] text-white rounded-xl p-3 font-semibold outline-none text-sm focus:border-violet-500"></select>
-                    <button onclick="addExerciseToToday()" class="bg-violet-600 text-white px-5 rounded-xl font-black text-lg shadow-lg hover:bg-violet-500 transition">+</button>
+                    <button onclick="addExerciseToWorkout()" class="bg-violet-600 text-white px-5 rounded-xl font-black text-lg shadow-lg hover:bg-violet-500 transition">+</button>
                 </div>
             </div>
 
             <!-- Bloc Notes de Séance -->
             <div class="mt-6 bg-[#1c1c1e] border border-[#333] p-5 rounded-2xl shadow-lg">
-                <p class="text-[10px] font-bold text-slate-400 mb-3 uppercase tracking-widest pl-1">Notes de la séance</p>
-                <textarea id="workout-notes" class="w-full bg-[#121212] border border-[#333] rounded-xl p-4 text-white text-sm font-medium focus:border-violet-500 outline-none mb-3" rows="3" placeholder="Douleurs, sensations, adaptations (ex: oiseau d'un seul bras)..."></textarea>
+                <p class="text-[10px] font-bold text-slate-400 mb-3 uppercase tracking-widest pl-1">📝 Notes de la séance</p>
+                <textarea id="workout-notes" class="w-full bg-[#121212] border border-[#333] rounded-xl p-4 text-white text-sm font-medium focus:border-violet-500 outline-none mb-3" rows="3" placeholder="Douleurs, sensations, adaptations..."></textarea>
                 <button onclick="saveWorkoutNote()" class="bg-[#2c2c2e] hover:bg-violet-600 text-violet-400 hover:text-white px-4 py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition w-full border border-[#444] hover:border-violet-500">Enregistrer la note</button>
             </div>
 
@@ -103,10 +111,13 @@
                     <button onclick="changeWeek(1)" class="bg-[#2c2c2e] w-10 h-10 rounded-full flex items-center justify-center font-bold text-slate-300 hover:text-white transition">&rarr;</button>
                 </div>
 
-                <!-- Grille des Jours (7 jours entiers) -->
-                <div id="week-grid" class="grid grid-cols-7 gap-1 sm:gap-2 mb-4"></div>
+                <div id="week-grid" class="grid grid-cols-7 gap-1 sm:gap-2 mb-6"></div>
 
-                <div id="day-editor" class="hidden bg-[#121212] border border-[#333] p-5 rounded-2xl relative mt-4">
+                <button onclick="importPartnerWorkout()" class="w-full bg-[#2c2c2e] hover:bg-emerald-600 text-emerald-400 hover:text-white px-4 py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition border border-emerald-900/50 hover:border-emerald-500 mb-6 flex justify-center items-center gap-2 shadow-lg">
+                    📥 Vérifier les partages reçus
+                </button>
+
+                <div id="day-editor" class="hidden bg-[#121212] border border-[#333] p-5 rounded-2xl relative">
                     <div class="flex justify-between items-center mb-5">
                         <h3 id="editor-date-label" class="text-white font-black text-lg">Lundi 12</h3>
                         <button onclick="closeDayEditor()" class="text-slate-500 font-black text-2xl hover:text-white bg-[#1c1c1e] w-8 h-8 rounded-full flex items-center justify-center pb-1">&times;</button>
@@ -137,6 +148,10 @@
                             </div>
                         </div>
                     </div>
+
+                    <button onclick="shareWorkoutToPartner()" class="w-full bg-violet-600/20 hover:bg-violet-600 text-violet-400 hover:text-white px-4 py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition border border-violet-500/30 hover:border-violet-500 mt-5 flex justify-center items-center gap-2">
+                        📤 Envoyer au partenaire
+                    </button>
                 </div>
 
             </div>
@@ -152,9 +167,7 @@
 
             <div class="bg-[#1c1c1e] p-6 rounded-[2rem] shadow-lg">
                 <h2 class="text-lg font-black text-white mb-6">Historique des Séances</h2>
-                <div id="workout-history-list" class="space-y-4">
-                    <!-- Historique généré en JS -->
-                </div>
+                <div id="workout-history-list" class="space-y-4"></div>
             </div>
         </div>
 
@@ -221,7 +234,7 @@
     <!-- Firebase & Logic -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-        import { getFirestore, collection, doc, setDoc, getDoc, addDoc, deleteDoc, updateDoc, onSnapshot, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+        import { getFirestore, collection, doc, setDoc, getDoc, addDoc, deleteDoc, updateDoc, onSnapshot, query, orderBy, serverTimestamp, Timestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
         import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 
         const firebaseConfig = {
@@ -249,14 +262,17 @@
         
         let currentWeekStartDate = new Date();
         let weekPlansData = {}; 
-        let weekCompletedData = {}; // NEW: Suivi des séances terminées
+        let weekCompletedData = {}; 
         let selectedPlanDateStr = null; 
         let chartInstance = null;
-        let todayPlannedExercises = [];
+        
+        // Date active dans l'onglet Séance
+        let currentWorkoutDate = new Date();
+        let currentWorkoutExercises = [];
+        
         window.forceShowInput = {}; 
         window.editingLogId = null;
 
-        // --- PLAN DE MIMI ---
         const mimiPlanData = [
             [   // Lundi
                 {name: "Chest-supported row", sets: "3", reps: "8–12"}, 
@@ -339,10 +355,8 @@
             return (new Date(d - offset)).toISOString().split('T')[0];
         };
         
-        const options = { weekday: 'long', month: 'long', day: 'numeric' };
-        const currentDateString = new Date().toLocaleDateString('fr-FR', options);
-        document.getElementById('current-date-display').innerText = currentDateString;
-        document.getElementById('rehab-date-display').innerText = currentDateString;
+        const optionsDate = { weekday: 'long', month: 'long', day: 'numeric' };
+        document.getElementById('rehab-date-display').innerText = new Date().toLocaleDateString('fr-FR', optionsDate);
 
         function getMonday(d) {
             d = new Date(d);
@@ -393,7 +407,7 @@
                 document.getElementById(`view-${t}`).classList.add('hidden');
                 document.getElementById(`tab-${t}`).classList.remove('active');
             });
-            const titles = { 'workout': 'Aujourd\'hui', 'plan': 'Planning', 'progress': 'Statistiques', 'rehab': 'Rééducation' };
+            const titles = { 'workout': 'Séance', 'plan': 'Planning', 'progress': 'Statistiques', 'rehab': 'Rééducation' };
             document.getElementById('header-title').innerText = titles[tab];
             
             document.getElementById(`view-${tab}`).classList.remove('hidden');
@@ -415,21 +429,15 @@
             onSnapshot(collection(db, `users/${currentUser.uid}/workoutNotes`), (snap) => {
                 allNotes = {};
                 snap.forEach(doc => { allNotes[doc.id] = doc.data().note; });
-                if(!document.getElementById('view-progress').classList.contains('hidden')) {
-                    renderWorkoutHistory();
-                }
+                if(!document.getElementById('view-progress').classList.contains('hidden')) renderWorkoutHistory();
             });
 
             const logsQuery = query(collection(db, `users/${currentUser.uid}/workoutLogs`), orderBy('ts', 'desc'));
             onSnapshot(logsQuery, (snapshot) => {
                 allLogs = [];
                 snapshot.forEach(doc => allLogs.push({id: doc.id, ...doc.data()}));
-                if(!document.getElementById('view-workout').classList.contains('hidden')) {
-                   renderWorkoutCards();
-                }
-                if(!document.getElementById('view-progress').classList.contains('hidden')) {
-                    renderWorkoutHistory();
-                }
+                if(!document.getElementById('view-workout').classList.contains('hidden')) renderWorkoutCards();
+                if(!document.getElementById('view-progress').classList.contains('hidden')) renderWorkoutHistory();
             });
 
             const rehabQuery = query(collection(db, `users/${currentUser.uid}/rehabLogs`), orderBy('ts', 'desc'));
@@ -460,7 +468,7 @@
                 if(count === 0) rehabList.innerHTML = '<p class="text-xs text-slate-500 italic">Aucun bilan enregistré pour le moment.</p>';
             });
 
-            loadTodayWorkout();
+            loadWorkoutForDate();
         }
 
         function updateExerciseDropdowns() {
@@ -510,34 +518,48 @@
             if(currentTodayVal && todaySelect) todaySelect.value = currentTodayVal;
         }
 
-        async function loadTodayWorkout() {
-            const dateStr = getLocalDateStr();
+        // --- NAVIGATION DANS LA SÉANCE ---
+        window.changeWorkoutDate = (offset) => {
+            currentWorkoutDate.setDate(currentWorkoutDate.getDate() + offset);
+            window.editingLogId = null; 
+            window.forceShowInput = {};
+            loadWorkoutForDate();
+        };
+
+        async function loadWorkoutForDate() {
+            const dateStr = getLocalDateStr(currentWorkoutDate);
             const docRef = doc(db, `users/${currentUser.uid}/plannedWorkouts`, dateStr);
             const docSnap = await getDoc(docRef);
             
+            // Mise à jour de l'en-tête
+            if (dateStr === getLocalDateStr(new Date())) {
+                document.getElementById('workout-day-title').innerText = "Aujourd'hui";
+            } else {
+                document.getElementById('workout-day-title').innerText = currentWorkoutDate.toLocaleDateString('fr-FR', {weekday: 'long'});
+            }
+            document.getElementById('current-date-display').innerText = currentWorkoutDate.toLocaleDateString('fr-FR', {day: 'numeric', month: 'long', year: 'numeric'});
+
             let isCompleted = false;
 
             if (docSnap.exists() && docSnap.data().exercises && docSnap.data().exercises.length > 0) {
-                todayPlannedExercises = docSnap.data().exercises;
+                currentWorkoutExercises = docSnap.data().exercises;
                 isCompleted = !!docSnap.data().completed;
-                document.getElementById('workout-day-title').innerText = "Séance du Jour";
                 
                 if (isCompleted) {
                     document.getElementById('workout-status-badge').innerText = `Terminée 🏆`;
                     document.getElementById('workout-status-badge').className = "bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 text-xs px-3 py-1 rounded-full font-bold";
                 } else {
-                    document.getElementById('workout-status-badge').innerText = `${todayPlannedExercises.length} Exercices`;
+                    document.getElementById('workout-status-badge').innerText = `${currentWorkoutExercises.length} Exercices`;
                     document.getElementById('workout-status-badge').className = "bg-violet-600/20 text-violet-400 border border-violet-500/30 text-xs px-3 py-1 rounded-full font-bold";
                 }
             } else {
-                todayPlannedExercises = [];
-                document.getElementById('workout-day-title').innerText = "Jour de Repos";
+                currentWorkoutExercises = [];
                 document.getElementById('workout-status-badge').innerText = "Aucun plan";
                 document.getElementById('workout-status-badge').className = "bg-slate-800 text-slate-400 text-xs px-3 py-1 rounded-full font-bold";
             }
 
             const btnComplete = document.getElementById('btn-complete-workout');
-            if (todayPlannedExercises.length > 0) {
+            if (currentWorkoutExercises.length > 0) {
                 btnComplete.classList.remove('hidden');
                 if (isCompleted) {
                     btnComplete.innerText = "✅ Séance Terminée (Annuler)";
@@ -560,7 +582,7 @@
         }
 
         window.toggleWorkoutCompletion = async () => {
-            const dateStr = getLocalDateStr();
+            const dateStr = getLocalDateStr(currentWorkoutDate);
             const docRef = doc(db, `users/${currentUser.uid}/plannedWorkouts`, dateStr);
             const docSnap = await getDoc(docRef);
             let currentlyCompleted = docSnap.exists() && !!docSnap.data().completed;
@@ -569,15 +591,15 @@
                 if(!confirm("Annuler la validation de cette séance ?")) return;
                 await setDoc(docRef, { completed: false }, { merge: true });
             } else {
-                if(!confirm("Valider définitivement la séance d'aujourd'hui ?")) return;
+                if(!confirm("Valider définitivement cette séance ?")) return;
                 await setDoc(docRef, { completed: true }, { merge: true });
             }
-            loadTodayWorkout();
+            loadWorkoutForDate();
         };
 
         window.saveWorkoutNote = async () => {
             const note = document.getElementById('workout-notes').value;
-            const dateStr = getLocalDateStr();
+            const dateStr = getLocalDateStr(currentWorkoutDate);
             try {
                 await setDoc(doc(db, `users/${currentUser.uid}/workoutNotes`, dateStr), {
                     note: note, ts: serverTimestamp()
@@ -593,35 +615,35 @@
             } catch (e) { alert("Erreur."); }
         };
 
-        window.addExerciseToToday = async () => {
+        window.addExerciseToWorkout = async () => {
             const ex = document.getElementById('today-add-ex-select').value;
             if(!ex) return;
-            if(!todayPlannedExercises.includes(ex)) {
-                todayPlannedExercises.push(ex);
-                const dateStr = getLocalDateStr();
+            if(!currentWorkoutExercises.includes(ex)) {
+                currentWorkoutExercises.push(ex);
+                const dateStr = getLocalDateStr(currentWorkoutDate);
                 await setDoc(doc(db, `users/${currentUser.uid}/plannedWorkouts`, dateStr), {
-                    exercises: todayPlannedExercises
+                    exercises: currentWorkoutExercises
                 }, { merge: true });
-                loadTodayWorkout();
+                loadWorkoutForDate();
             }
         };
 
-        window.removeExerciseFromToday = async (exName) => {
-            if(!confirm(`Retirer ${exName} de la séance d'aujourd'hui ?\n(Cela supprimera aussi les séries enregistrées pour cet exo)`)) return;
+        window.removeExerciseFromWorkout = async (exName) => {
+            if(!confirm(`Retirer ${exName} de cette séance ?\n(Cela supprimera aussi les séries enregistrées pour cet exo à cette date)`)) return;
             
-            todayPlannedExercises = todayPlannedExercises.filter(e => e !== exName);
-            const dateStr = getLocalDateStr();
+            currentWorkoutExercises = currentWorkoutExercises.filter(e => e !== exName);
+            const dateStr = getLocalDateStr(currentWorkoutDate);
             await setDoc(doc(db, `users/${currentUser.uid}/plannedWorkouts`, dateStr), {
-                exercises: todayPlannedExercises
+                exercises: currentWorkoutExercises
             }, { merge: true });
             
-            const todayStr = new Date().toDateString();
-            const logsToDelete = allLogs.filter(l => l.exercise === exName && l.ts && new Date(l.ts.toDate()).toDateString() === todayStr);
+            const targetDateStr = currentWorkoutDate.toDateString();
+            const logsToDelete = allLogs.filter(l => l.exercise === exName && l.ts && new Date(l.ts.toDate()).toDateString() === targetDateStr);
             
             for (let log of logsToDelete) {
                 await deleteDoc(doc(db, `users/${currentUser.uid}/workoutLogs`, log.id));
             }
-            loadTodayWorkout();
+            loadWorkoutForDate();
         };
 
         window.startEdit = (logId) => {
@@ -666,11 +688,11 @@
             const container = document.getElementById('workout-exercises-container');
             container.innerHTML = '';
             
-            const todayStr = new Date().toDateString();
-            const todayLogs = allLogs.filter(l => l.ts && new Date(l.ts.toDate()).toDateString() === todayStr);
+            const targetDateStr = currentWorkoutDate.toDateString();
+            const targetLogs = allLogs.filter(l => l.ts && new Date(l.ts.toDate()).toDateString() === targetDateStr);
 
-            let exercisesToShow = [...todayPlannedExercises];
-            let loggedExNames = [...new Set(todayLogs.map(l => l.exercise))];
+            let exercisesToShow = [...currentWorkoutExercises];
+            let loggedExNames = [...new Set(targetLogs.map(l => l.exercise))];
             loggedExNames.forEach(ex => {
                 if(!exercisesToShow.includes(ex)) exercisesToShow.push(ex);
             });
@@ -679,14 +701,16 @@
                 container.innerHTML = `
                     <div class="text-center py-10">
                         <span class="text-5xl block mb-4">🛋️</span>
-                        <p class="text-slate-400 font-medium">Rien de prévu aujourd'hui.</p>
+                        <p class="text-slate-400 font-medium">Rien de prévu pour ce jour.</p>
                     </div>`;
                 return;
             }
 
             exercisesToShow.forEach((exName, exIndex) => {
-                const exLogs = todayLogs.filter(l => l.exercise === exName).reverse(); 
-                const lastPerfLog = allLogs.find(l => l.exercise === exName && new Date(l.ts?.toDate()).toDateString() !== todayStr);
+                const exLogs = targetLogs.filter(l => l.exercise === exName).reverse(); 
+                
+                // Pour "dernière perf", on cherche avant la date sélectionnée (pas "avant aujourd'hui")
+                const lastPerfLog = allLogs.find(l => l.exercise === exName && l.ts && new Date(l.ts.toDate()) < currentWorkoutDate);
                 const safeName = exName.replace(/'/g, "\\'");
                 
                 const card = document.createElement('div');
@@ -709,7 +733,7 @@
                             </div>
                             ${perfHTML}
                         </div>
-                        <button onclick="removeExerciseFromToday('${safeName}')" class="text-slate-500 hover:text-red-500 px-2 text-2xl leading-none">&times;</button>
+                        <button onclick="removeExerciseFromWorkout('${safeName}')" class="text-slate-500 hover:text-red-500 px-2 text-2xl leading-none">&times;</button>
                     </div>
                     
                     <div class="space-y-2 mb-4">
@@ -801,10 +825,55 @@
 
             try {
                 window.forceShowInput[exName] = false;
+                
+                // On fixe la date d'enregistrement à la date sélectionnée dans l'interface
+                let tsDate = new Date();
+                const parts = getLocalDateStr(currentWorkoutDate).split('-'); 
+                tsDate.setFullYear(parseInt(parts[0]), parseInt(parts[1])-1, parseInt(parts[2]));
+                
                 await addDoc(collection(db, `users/${currentUser.uid}/workoutLogs`), {
-                    exercise: exName, weight, reps, ts: serverTimestamp()
+                    exercise: exName, weight, reps, ts: Timestamp.fromDate(tsDate)
                 });
             } catch (e) { alert("Erreur d'enregistrement."); }
+        };
+
+        // --- PARTAGE ---
+        window.shareWorkoutToPartner = async () => {
+            const exos = weekPlansData[selectedPlanDateStr] || [];
+            if(exos.length === 0) return alert("Cette séance est vide ! Ajoute des exercices avant d'envoyer.");
+            
+            try {
+                await setDoc(doc(db, "shared", "partner_sync"), {
+                    sender: currentUser.displayName || "Ton partenaire",
+                    date: selectedPlanDateStr,
+                    exercises: exos,
+                    ts: serverTimestamp()
+                });
+                alert("Séance envoyée ! Ton partenaire peut maintenant la récupérer.");
+            } catch (e) { alert("Erreur lors de l'envoi de la séance."); }
+        };
+
+        window.importPartnerWorkout = async () => {
+            try {
+                const snap = await getDoc(doc(db, "shared", "partner_sync"));
+                if (snap.exists() && snap.data().exercises) {
+                    const data = snap.data();
+                    const dParts = data.date.split('-');
+                    const d = new Date(dParts[0], dParts[1]-1, dParts[2]).toLocaleDateString('fr-FR', {weekday: 'long', day: 'numeric', month: 'long'});
+                    
+                    if(confirm(`Récupérer la séance du ${d} envoyée par ${data.sender} ?\n(Cela sera placé exactement à cette date dans ton plan)`)) {
+                        await setDoc(doc(db, `users/${currentUser.uid}/plannedWorkouts`, data.date), {
+                            exercises: data.exercises,
+                            completed: false
+                        }, { merge: true });
+                        loadWeekView();
+                        if(data.date === getLocalDateStr(currentWorkoutDate)) loadWorkoutForDate();
+                        alert("Séance importée à la date prévue !");
+                    }
+                } else {
+                    alert("Aucune séance n'a été partagée récemment.");
+                }
+            } catch (e) { alert("Erreur lors de la récupération."); }
         };
 
         // --- PLANNING ---
@@ -941,7 +1010,7 @@
 
         async function savePlanToDB(dateStr, exosArr) {
             await setDoc(doc(db, `users/${currentUser.uid}/plannedWorkouts`, dateStr), { exercises: exosArr }, { merge: true });
-            if(dateStr === getLocalDateStr()) loadTodayWorkout();
+            if(dateStr === getLocalDateStr(currentWorkoutDate)) loadWorkoutForDate();
         }
 
         window.shiftWorkout = async () => {
@@ -958,7 +1027,7 @@
                     weekPlansData[selectedPlanDateStr] = []; 
                     closeDayEditor();
                     loadWeekView(); 
-                    if(selectedPlanDateStr === getLocalDateStr() || targetDateStr === getLocalDateStr()) loadTodayWorkout();
+                    if(selectedPlanDateStr === getLocalDateStr(currentWorkoutDate) || targetDateStr === getLocalDateStr(currentWorkoutDate)) loadWorkoutForDate();
                 } catch(e) { alert("Erreur lors du décalage."); }
             }
         };
@@ -978,7 +1047,7 @@
                         }, { merge: true });
                         renderEditorList();
                         loadWeekView();
-                        if(selectedPlanDateStr === getLocalDateStr()) loadTodayWorkout();
+                        if(selectedPlanDateStr === getLocalDateStr(currentWorkoutDate)) loadWorkoutForDate();
                     }
                 } else { alert("Aucun plan trouvé à cette date !"); }
             } catch(e) { alert("Erreur lors de la copie."); }
@@ -1030,7 +1099,7 @@
             
             let count = 0;
             sortedKeys.forEach(key => {
-                if(count >= 15) return; // Affiche les 15 dernières
+                if(count >= 15) return; 
                 const dayData = grouped[key];
                 const dateStrDisplay = dayData.date.toLocaleDateString('fr-FR', {weekday: 'long', day: 'numeric', month: 'long'});
                 const note = allNotes[key];
